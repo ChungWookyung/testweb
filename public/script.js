@@ -225,6 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function renderRanking(items, period) {
+        if (!rankingList) return;
+
         rankingList.innerHTML = `
             <div style="padding: 2rem; text-align: center;">
                 <div class="spinner" style="width:24px; height:24px; border-width:2px; margin: 0 auto 10px;"></div>
@@ -232,59 +234,80 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        const now = new Date();
-
-        // 1. Filter Items by Date
-        const filteredItems = items.filter(item => {
-            const pubDate = new Date(item.querySelector('pubDate').textContent);
-            const diffTime = Math.abs(now - pubDate);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-            if (period === 'today') return diffDays <= 1;
-            if (period === 'week') return diffDays <= 7;
-            if (period === 'month') return diffDays <= 30;
-            return true;
-        });
-
-        if (filteredItems.length === 0) {
-            rankingList.innerHTML = '<li style="padding:1rem; color:#666; font-size:0.8rem;">該当する記事がありません</li>';
-            return;
-        }
-
-        // 2. Prepare Payload (Limit to top 20 candidates to rank)
-        const candidates = filteredItems.slice(0, 20).map((item, index) => {
-            const title = item.querySelector('title').textContent;
-            return { id: index, title: title }; // Using index in filtered array as ID
-        });
-
         try {
-            // 3. Call AI Ranking API
-            const response = await fetch('/api/rank', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: candidates })
-            });
+            const now = new Date();
 
-            if (!response.ok) throw new Error("Ranking failed");
+            // 1. Filter Items by Date
+            const filteredItems = items.filter(item => {
+                try {
+                    const pubDateNode = item.querySelector('pubDate');
+                    if (!pubDateNode) return false;
 
-            const data = await response.json();
-            const rankedIds = data.rankedIds || [];
+                    const pubDate = new Date(pubDateNode.textContent);
+                    if (isNaN(pubDate.getTime())) return false; // Invalid Date
 
-            // 4. Sort items based on returned IDs
-            // If ID not in list, put at bottom
-            const sortedItems = [];
-            rankedIds.forEach(id => {
-                if (filteredItems[id]) {
-                    sortedItems.push(filteredItems[id]);
+                    const diffTime = Math.abs(now - pubDate);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    if (period === 'today') return diffDays <= 1;
+                    if (period === 'week') return diffDays <= 7;
+                    if (period === 'month') return diffDays <= 30;
+                    return true;
+                } catch (err) {
+                    console.warn("Date parse error", err);
+                    return false;
                 }
             });
 
-            // Fill remaining if less than 5 returned (though prompt asks for 5)
-            // or if API failed to return valid IDs. 
-            // Also ensure we have unique items.
-            const seenLinks = new Set(sortedItems.map(i => i.querySelector('link').textContent));
+            if (filteredItems.length === 0) {
+                // Fallback: If no items match "Today", try showing general top items or message
+                // For now, consistent message
+                rankingList.innerHTML = '<li style="padding:1rem; color:#666; font-size:0.8rem;">期間内の記事が見つかりませんでした</li>';
+                return;
+            }
+
+            // 2. Prepare Payload (Limit to top 20 candidates to rank)
+            const candidates = filteredItems.slice(0, 20).map((item, index) => {
+                const titleNode = item.querySelector('title');
+                const title = titleNode ? titleNode.textContent : "No Title";
+                return { id: index, title: title }; // Using index in filtered array as ID
+            });
+
+            // 3. Call AI Ranking API
+            let rankedIds = [];
+            try {
+                const response = await fetch('/api/rank', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: candidates })
+                });
+
+                if (!response.ok) throw new Error("Ranking request failed");
+                const data = await response.json();
+                rankedIds = data.rankedIds || [];
+            } catch (apiError) {
+                console.warn("Ranking API failed, falling back to date order", apiError);
+                // Fallback to empty array to trigger client-side fallback logic below
+            }
+
+            // 4. Sort items based on returned IDs
+            const sortedItems = [];
+            if (rankedIds.length > 0) {
+                rankedIds.forEach(id => {
+                    if (filteredItems[id]) {
+                        sortedItems.push(filteredItems[id]);
+                    }
+                });
+            } else {
+                // If API failed or returned explicit empty, use filteredItems as is (Date sorted usually)
+                // Filtered items are already in RSS order (Date Descending usually)
+                sortedItems.push(...filteredItems.slice(0, 5));
+            }
+
+            // Fill remaining if needed (deduplication)
+            const seenLinks = new Set(sortedItems.map(i => i.querySelector('link') ? i.querySelector('link').textContent : ""));
             filteredItems.forEach(item => {
-                const link = item.querySelector('link').textContent;
+                const link = item.querySelector('link') ? item.querySelector('link').textContent : "";
                 if (!seenLinks.has(link) && sortedItems.length < 5) {
                     sortedItems.push(item);
                 }
@@ -293,8 +316,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // 5. Render Top 5
             rankingList.innerHTML = '';
             sortedItems.slice(0, 5).forEach((item) => {
-                const title = item.querySelector('title').textContent;
-                const link = item.querySelector('link').textContent;
+                const titleNode = item.querySelector('title');
+                const linkNode = item.querySelector('link');
+
+                const title = titleNode ? titleNode.textContent : "無題";
+                const link = linkNode ? linkNode.textContent : "#";
 
                 let cleanTitle = title;
                 const hyphenIndex = title.lastIndexOf(' - ');
@@ -314,28 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
         } catch (e) {
-            console.error("Ranking Error", e);
-            // Fallback: Date Based (original logic)
-            rankingList.innerHTML = '';
-            filteredItems.slice(0, 5).forEach((item) => {
-                const title = item.querySelector('title').textContent;
-                const link = item.querySelector('link').textContent;
-                let cleanTitle = title;
-                const hyphenIndex = title.lastIndexOf(' - ');
-                if (hyphenIndex > 0) cleanTitle = title.substring(0, hyphenIndex);
-
-                const li = document.createElement('li');
-                li.className = 'ranking-item';
-                li.onclick = () => window.open(link, '_blank');
-
-                li.innerHTML = `
-                    <div class="ranking-rank"></div>
-                    <div class="ranking-content">
-                        <div class="ranking-title">${cleanTitle}</div>
-                    </div>
-                `;
-                rankingList.appendChild(li);
-            });
+            console.error("Critical Ranking Render Error", e);
+            rankingList.innerHTML = '<li style="padding:1rem; color:#ef4444; font-size:0.8rem;">ランキング読み込みエラー</li>';
         }
     }
 
