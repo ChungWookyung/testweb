@@ -22,18 +22,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Sidebar Toggle Logic
     // Sidebar Toggle Logic (Updated for Nested Structure)
+    // Sidebar Toggle Logic (Main Sections)
     const sectionTitles = document.querySelectorAll('.section-title');
     sectionTitles.forEach(title => {
         title.addEventListener('click', () => {
             const section = title.parentElement;
-            // Toggle all categories lists within this section
-            const categories = section.querySelectorAll('.categories');
-            categories.forEach(cat => cat.classList.toggle('collapsed'));
 
-            // Toggle title arrow
+            // Toggle title arrow first to determine target state
             title.classList.toggle('collapsed');
+            const isCollapsed = title.classList.contains('collapsed');
+
+            // Force all children to match the section state
+            const categories = section.querySelectorAll('.categories');
+            categories.forEach(cat => {
+                if (isCollapsed) cat.classList.add('collapsed');
+                else cat.classList.remove('collapsed');
+            });
+
+            const midCatTitles = section.querySelectorAll('.mid-cat-title');
+            midCatTitles.forEach(t => {
+                if (isCollapsed) t.classList.add('collapsed');
+                else t.classList.remove('collapsed');
+            });
         });
     });
+
+    // Sidebar Toggle Logic (Sub-Categories)
+    const midCatTitles = document.querySelectorAll('.mid-cat-title');
+    midCatTitles.forEach(title => {
+        title.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent bubbling to section title
+            const categoryList = title.nextElementSibling; // The <ul>
+            if (categoryList && categoryList.classList.contains('categories')) {
+                categoryList.classList.toggle('collapsed');
+                title.classList.toggle('collapsed');
+            }
+        });
+    });
+
+    // Mobile: Default to collapsed
+    if (window.innerWidth <= 768) {
+        sectionTitles.forEach(title => {
+            // Trigger click to collapse (since default is open)
+            // Or manually add classes
+            const section = title.parentElement;
+            const categories = section.querySelectorAll('.categories');
+            categories.forEach(cat => cat.classList.add('collapsed'));
+            title.classList.add('collapsed');
+        });
+
+        midCatTitles.forEach(title => {
+            // Also collapse sub-categories specifically
+            const categoryList = title.nextElementSibling;
+            if (categoryList) categoryList.classList.add('collapsed');
+            title.classList.add('collapsed');
+        });
+    }
 
     categoryItems.forEach(item => {
         item.addEventListener('click', () => {
@@ -49,8 +93,9 @@ document.addEventListener('DOMContentLoaded', () => {
             currentTopic = topic;
             currentRegion = region;
 
-            const regionLabel = region === 'us' ? ' (World)' : '';
-            currentTopicLabel.textContent = topic + regionLabel;
+            // Use the text content of the clicked item for the display title
+            const displayTitle = item.firstChild.textContent.trim();
+            currentTopicLabel.textContent = displayTitle;
 
             // Clear search (visual)
             searchInput.value = '';
