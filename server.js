@@ -27,11 +27,19 @@ app.get('/api/news', (req, res) => {
     });
 });
 
-// Helper to fetch text from URL (Simple implementation)
+// Helper to fetch text from URL (Improved implementation)
 const fetchUrlText = (url) => {
     return new Promise((resolve, reject) => {
         const protocol = url.startsWith('https') ? https : require('http');
-        const req = protocol.get(url, (res) => {
+        const options = {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3'
+            }
+        };
+
+        const req = protocol.get(url, options, (res) => {
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
                 // Follow redirect
                 fetchUrlText(res.headers.location).then(resolve).catch(reject);
@@ -41,17 +49,30 @@ const fetchUrlText = (url) => {
             let data = '';
             res.on('data', (chunk) => { data += chunk; });
             res.on('end', () => {
-                // Very basic HTML text extraction
-                const text = data.replace(/<script[^>]*>([\s\S]*?)<\/script>/gmi, "")
-                    .replace(/<style[^>]*>([\s\S]*?)<\/style>/gmi, "")
-                    .replace(/<[^>]+>/g, " ")
-                    .replace(/\s+/g, " ")
-                    .trim();
+                // Identify paragraphs
+                const pTags = data.match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
+
+                let text = "";
+                if (pTags && pTags.length > 0) {
+                    // Extract text from P tags
+                    text = pTags.map(p => {
+                        return p.replace(/<[^>]+>/g, "").trim(); // Remove tags inside p
+                    }).join("\n");
+                } else {
+                    // Fallback to naive stripping if no p tags found (rare but possible)
+                    text = data.replace(/<script[^>]*>([\s\S]*?)<\/script>/gmi, "")
+                        .replace(/<style[^>]*>([\s\S]*?)<\/style>/gmi, "")
+                        .replace(/<[^>]+>/g, " ")
+                        .trim();
+                }
+
+                // Clean up whitespace
+                text = text.replace(/\s+/g, " ").trim();
                 resolve(text);
             });
         });
         req.on('error', (e) => resolve("")); // Resolve empty on error to fallback
-        req.setTimeout(5000, () => {
+        req.setTimeout(8000, () => {
             req.abort();
             resolve("");
         });
