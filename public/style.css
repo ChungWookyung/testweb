@@ -634,51 +634,56 @@ body {
         overflow: visible;
     }
 
-    /* Update Count Badge */
-    .update-count {
-        display: inline-block;
-        background-color: transparent;
-        color: var(--primary-color);
-        font-size: 0.9rem;
-        font-weight: 700;
-        margin-left: 6px;
-        vertical-align: middle;
-        animation: fadeIn 0.5s ease-out;
+}
+
+
+/* Universal Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
     }
 
-    /* New! Badge for Articles */
-    .new-badge {
-        display: inline-block;
-        color: #c00;
-        /* Urgent Red */
-        font-weight: 700;
-        font-size: 0.8rem;
-        margin-left: 8px;
-        animation: pulse 2s infinite;
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
     }
 
-    @keyframes pulse {
-        0% {
-            opacity: 1;
-        }
-
-        50% {
-            opacity: 0.7;
-        }
-
-        100% {
-            opacity: 1;
-        }
+    50% {
+        opacity: 0.7;
     }
 
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: scale(0.8);
-        }
-
-        to {
-            opacity: 1;
-            transform: scale(1);
-        }
+    100% {
+        opacity: 1;
     }
+}
+
+/* Update Count Badge (Global) */
+.update-count {
+    display: inline-block;
+    background-color: transparent;
+    color: var(--primary-color);
+    /* Blue */
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* New! Badge for Articles (Global) */
+.new-badge {
+    display: inline-block;
+    color: #c00;
+    /* Red */
+    font-weight: 700;
+    font-size: 0.8rem;
+    margin-left: 8px;
+    animation: pulse 2s infinite;
+}

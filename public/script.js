@@ -220,6 +220,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                 });
 
+                // New! Badge logic
+                const now = new Date();
+                const oneDayMs = 24 * 60 * 60 * 1000;
+                let newBadgeHtml = '';
+                if ((now - dateObj) < oneDayMs) {
+                    newBadgeHtml = ' <span class="new-badge">New!</span>';
+                }
+
                 const totalIndex = allCurrentItems.indexOf(item);
                 const summaryId = `summary-${totalIndex}`;
 
@@ -233,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="card-main">
                         <div class="card-meta">
                            <span class="card-date">${dateStr}</span>
-                           <span class="card-relative-time">${relativeTime}</span>
+                           <span class="card-relative-time">${relativeTime}${newBadgeHtml}</span>
                         </div>
                         <h3>${title}</h3>
                         <div class="card-source">${source}</div>
@@ -361,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (newCount > 0) {
                     const badge = document.createElement('span');
                     badge.className = 'update-count';
-                    badge.innerHTML = `+${newCount}`;
+                    badge.innerHTML = ` +${newCount}`;
                     item.appendChild(badge);
                 }
 
