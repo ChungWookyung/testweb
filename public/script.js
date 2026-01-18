@@ -345,8 +345,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!element) return;
 
         try {
-            // Delay to avoid hitting rate limits instantly
-            await new Promise(r => setTimeout(r, Math.random() * 2000));
+            // Removed artificial delay to allow instant cache display
+            // await new Promise(r => setTimeout(r, Math.random() * 2000));
 
             const res = await fetch('/api/summarize', {
                 method: 'POST',
