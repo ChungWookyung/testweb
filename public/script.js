@@ -132,10 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
             newsGrid.innerHTML = ''; // Clear existing
             renderNextBatch();
 
-            // Render default ranking (Today)
-            const activeTab = document.querySelector('.tab-btn.active');
-            const period = activeTab ? activeTab.getAttribute('data-period') : 'today';
-            renderRanking(items, period);
+
 
         } catch (error) {
             console.error('Error fetching news:', error);
@@ -339,125 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function renderRanking(items, period) {
-        if (!rankingList) return;
 
-        rankingList.innerHTML = `
-            <div style="padding: 2rem; text-align: center;">
-                <div class="spinner" style="width:24px; height:24px; border-width:2px; margin: 0 auto 10px;"></div>
-                <div style="font-size:0.8rem; color:#666;">エコノミストAIが分析中...</div>
-            </div>
-        `;
-
-        try {
-            const now = new Date();
-
-            // 1. Filter Items by Date
-            const filteredItems = items.filter(item => {
-                try {
-                    const pubDateNode = item.querySelector('pubDate');
-                    if (!pubDateNode) return false;
-
-                    const pubDate = new Date(pubDateNode.textContent);
-                    if (isNaN(pubDate.getTime())) return false; // Invalid Date
-
-                    const diffTime = Math.abs(now - pubDate);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                    if (period === 'today') return diffDays <= 2; // Relaxed
-                    if (period === 'week') return diffDays <= 7;
-                    if (period === 'month') return diffDays <= 30;
-                    return true;
-                } catch (err) {
-                    console.warn("Date parse error", err);
-                    return false;
-                }
-            });
-
-            if (filteredItems.length === 0) {
-                rankingList.innerHTML = '<li style="padding:1rem; color:#666; font-size:0.8rem;">期間内の記事が見つかりませんでした</li>';
-                return;
-            }
-
-            // 2. Prepare Payload
-            const candidates = filteredItems.slice(0, 15).map((item, index) => {
-                const title = item.querySelector('title')?.textContent || "No Title";
-                return { id: index, title: title };
-            });
-
-            // 3. Call AI Ranking API
-            let rankedIds = [];
-            try {
-                // If API key is missing on server, this will fail or return error json.
-                // We expect 500 error currently.
-                const response = await fetch('/api/rank', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items: candidates })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    rankedIds = data.rankedIds || [];
-                } else {
-                    console.warn("Ranking API returned error status:", response.status);
-                }
-            } catch (apiError) {
-                console.warn("Ranking API failed, falling back to date order", apiError);
-            }
-
-            // 4. Construct Sorted List
-            const sortedItems = [];
-
-            // If AI returned a valid list, use it
-            if (rankedIds.length > 0) {
-                rankedIds.forEach(id => {
-                    if (filteredItems[id]) {
-                        sortedItems.push(filteredItems[id]);
-                    }
-                });
-            }
-
-            // FALLBACK / FILLER:
-            // Ensure we have at least 5 items (or max available)
-            // If sortedItems is empty (API failed), this fills it completely with the newest items.
-            if (sortedItems.length < 5) {
-                for (const item of filteredItems) {
-                    if (sortedItems.length >= 5) break;
-                    if (!sortedItems.includes(item)) {
-                        sortedItems.push(item);
-                    }
-                }
-            }
-
-            // 5. Render Top 5
-            rankingList.innerHTML = '';
-            sortedItems.slice(0, 5).forEach((item, index) => {
-                const title = item.querySelector('title')?.textContent || "無題";
-                const link = item.querySelector('link')?.textContent || "#";
-
-                let cleanTitle = title;
-                const hyphenIndex = title.lastIndexOf(' - ');
-                if (hyphenIndex > 0) cleanTitle = title.substring(0, hyphenIndex);
-
-                const li = document.createElement('li');
-                li.className = 'ranking-item';
-                li.onclick = () => window.open(link, '_blank');
-
-                li.innerHTML = `
-                    <div class="ranking-rank">${index + 1}</div>
-                    <div class="ranking-content">
-                        <div class="ranking-title">${cleanTitle}</div>
-                    </div>
-                `;
-                rankingList.appendChild(li);
-            });
-
-        } catch (e) {
-            console.error("Critical Ranking Render Error", e);
-            rankingList.innerHTML = '<li style="padding:1rem; color:#ef4444; font-size:0.8rem;">ランキング読み込みエラー</li>';
-        }
-    }
 
     function showLoading() {
         newsGrid.innerHTML = `

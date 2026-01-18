@@ -185,46 +185,7 @@ app.post('/api/summarize', express.json(), async (req, res) => {
 });
 
 // Ranking Endpoint using Gemini SDK
-app.post('/api/rank', express.json(), async (req, res) => {
-    const { items } = req.body;
 
-    if (!GEMINI_API_KEY) {
-        return res.status(500).json({ error: "Server Configuration Error: API Key missing" });
-    }
-
-    console.log(`[Gemini] Ranking ${items.length} items...`);
-
-    try {
-        const model = getGeminiModel();
-        const itemsList = items.map(item => `ID:${item.id} Title:${item.title}`).join('\n');
-        const prompt = `あなたはチーフエコノミストです。以下のニュース記事リストを、エコノミストの視点で「市場や経済への影響が大きい順」にランク付けし、上位5つのIDをJSON配列で返してください。
-理由などは不要です。純粋なJSON配列のみを返してください。例: [10, 2, 5, 8, 1]
-
-ニュースリスト:
-${itemsList}`;
-
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-
-        if (text) {
-            const match = text.match(/\[.*\]/s);
-            if (match) {
-                const rankedIds = JSON.parse(match[0]);
-                console.log(`[Gemini] Ranked IDs: ${rankedIds}`);
-                res.json({ rankedIds });
-            } else {
-                throw new Error("No JSON array found in response");
-            }
-        } else {
-            res.status(500).json({ error: "No ranking generated" });
-        }
-
-    } catch (e) {
-        console.error("Ranking failed completely:", e);
-        res.status(500).json({ error: "Server error", details: e.message });
-    }
-});
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
