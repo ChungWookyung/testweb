@@ -170,6 +170,10 @@ try {
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Simple in-memory cache
+const newsCache = new Map();
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
 // Proxy endpoint to fetch Google News RSS
 // Proxy endpoint to fetch Google News RSS or Custom RSS
 app.get('/api/news', (req, res) => {
@@ -187,6 +191,17 @@ app.get('/api/news', (req, res) => {
     } else {
         // Japanese (Default)
         url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ja&gl=JP&ceid=JP:ja`;
+    }
+
+    // Check Cache
+    const cacheKey = url;
+    if (newsCache.has(cacheKey)) {
+        const cached = newsCache.get(cacheKey);
+        if (Date.now() - cached.timestamp < CACHE_DURATION) {
+            console.log(`[Cache] Hit for: ${url}`);
+            res.set('Content-Type', 'application/xml');
+            return res.send(cached.data);
+        }
     }
 
     const { URL } = require('url'); // Ensure URL module is available
@@ -209,6 +224,12 @@ app.get('/api/news', (req, res) => {
             // If Custom URL, we might need to filter for AI keywords manually if requested
             // Custom URL handling is done via proxying raw data.
             // Client-side script.js handles the AI keyword filtering for custom sources.
+
+            // Save to Cache
+            newsCache.set(cacheKey, {
+                timestamp: Date.now(),
+                data: data
+            });
 
             res.set('Content-Type', 'application/xml');
             res.send(data);
@@ -294,9 +315,39 @@ const fetchUrlText = (url) => {
     });
 };
 
+// Persistent Summary Cache
+const SUMMARY_CACHE_FILE = path.join(__dirname, 'summary_cache.json');
+let summaryCache = {};
+
+// Load cache from disk
+try {
+    if (fs.existsSync(SUMMARY_CACHE_FILE)) {
+        summaryCache = JSON.parse(fs.readFileSync(SUMMARY_CACHE_FILE, 'utf-8'));
+        console.log(`[Cache] Loaded ${Object.keys(summaryCache).length} summaries from disk.`);
+    }
+} catch (e) {
+    console.error("Failed to load summary cache:", e);
+}
+
+// Helper to save cache
+const saveSummaryCache = () => {
+    try {
+        fs.writeFileSync(SUMMARY_CACHE_FILE, JSON.stringify(summaryCache, null, 2));
+    } catch (e) {
+        console.error("Failed to save summary cache:", e);
+    }
+};
+
 // Summarize Endpoint using Gemini API (Inference Mode)
 app.post('/api/summarize', express.json(), async (req, res) => {
     const { url, title, description } = req.body;
+
+    // Check Cache first (Use URL as key, fallback to title if needed)
+    const cacheKey = url || title;
+    if (summaryCache[cacheKey]) {
+        console.log(`[Summary Cache] Hit for: ${title}`);
+        return res.json({ summary: summaryCache[cacheKey] });
+    }
 
     if (!GEMINI_API_KEY) {
         return res.status(500).json({ error: "Server Configuration Error: API Key missing" });
@@ -312,6 +363,12 @@ app.post('/api/summarize', express.json(), async (req, res) => {
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
+
+        // Save to Cache
+        if (text) {
+            summaryCache[cacheKey] = text;
+            saveSummaryCache(); // Persist immediately
+        }
 
         res.json({ summary: text });
     } catch (e) {
