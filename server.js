@@ -165,11 +165,8 @@ app.post('/api/summarize', express.json(), async (req, res) => {
     };
 
     try {
-        // Try requested "gemini-2.5-flash-lite" first
-        let data = await callGeminiSummary('gemini-2.5-flash-lite').catch(async (e) => {
-            console.warn(`gemini-2.5-flash-lite summary failed (${e.message}). Falling back to gemini-1.5-flash.`);
-            return await callGeminiSummary('gemini-1.5-flash');
-        });
+        // STRICTLY use gemini-2.5-flash-lite only. No fallback.
+        let data = await callGeminiSummary('gemini-2.5-flash-lite');
 
         const json = JSON.parse(data);
         if (json.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -179,7 +176,7 @@ app.post('/api/summarize', express.json(), async (req, res) => {
         }
     } catch (e) {
         console.error("Summary failed:", e);
-        res.status(500).json({ error: "Server error" });
+        res.status(500).json({ error: "Server error", details: e.message });
     }
 });
 
@@ -228,12 +225,9 @@ ${itemsList}`;
     };
 
     try {
-        // Try requested "gemini-2.5-flash-lite" first
+        // STRICTLY use gemini-2.5-flash-lite only. No fallback.
         console.log("Attempting ranking with gemini-2.5-flash-lite...");
-        let data = await callGeminiRanking('gemini-2.5-flash-lite').catch(async (e) => {
-            console.warn(`gemini-2.5-flash-lite failed (${e.message}). Falling back to gemini-1.5-flash.`);
-            return await callGeminiRanking('gemini-1.5-flash');
-        });
+        let data = await callGeminiRanking('gemini-2.5-flash-lite');
 
         const json = JSON.parse(data);
         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
