@@ -4,49 +4,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AIニュースダッシュボード">
-    <title>AIニュースダッシュボード</title>
+    <meta name="description" content="AIニュース電子版">
+    <title>AIニュース電子版</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Google Fonts for premium typography -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <!-- Icons -->
+    <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 </head>
 
 <body>
-    <div class="background-globes">
-        <div class="globe globe-1"></div>
-        <div class="globe globe-2"></div>
-        <div class="globe globe-3"></div>
-    </div>
+    <!-- Background globes removed for professional look -->
 
     <div class="dashboard-container">
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="logo">
-                <span class="material-icons-round">smart_toy</span>
-                <h2>AIニュース</h2>
+                <span class="material-icons-round">newspaper</span>
+                <h2>AIニュース 電子版</h2>
             </div>
 
             <div class="search-box">
-                <input type="text" id="search-input" placeholder="トピックを検索...">
+                <input type="text" id="search-input" placeholder="記事を検索...">
                 <button id="search-btn">
                     <span class="material-icons-round">search</span>
                 </button>
             </div>
 
             <nav class="categories">
-                <h3>トレンド</h3>
+                <h3>主要トピック</h3>
                 <ul>
                     <li data-query="人工知能" class="active">人工知能</li>
                     <li data-query="機械学習">機械学習</li>
-                    <li data-query="大規模言語モデル">LLM / 大規模言語モデル</li>
+                    <li data-query="大規模言語モデル">LLM・基盤モデル</li>
                     <li data-query="生成AI">生成AI</li>
-                    <li data-query="ロボティクス">ロボティクス</li>
+                    <li data-query="ロボティクス">ロボティクス・自動化</li>
                     <li data-query="OpenAI">OpenAI</li>
-                    <li data-query="Google Gemini">Gemini</li>
+                    <li data-query="Google Gemini">Google Gemini</li>
+                    <li data-query="半導体 AI">AI半導体</li>
                 </ul>
             </nav>
         </aside>
@@ -54,9 +47,9 @@
         <!-- Main Content -->
         <main class="main-content">
             <header class="top-bar">
-                <h1 id="current-topic">人工知能</h1>
+                <h1 id="current-topic">詳細記事</h1>
                 <div class="status-indicator" id="status-indicator">
-                    <span class="dot"></span> ライブ配信中
+                    <span class="dot"></span> 速報
                 </div>
             </header>
 
@@ -64,7 +57,7 @@
                 <!-- News cards will be injected here -->
                 <div class="loading-state">
                     <div class="spinner"></div>
-                    <p>最新ニュースを取得中...</p>
+                    <p>紙面を更新中...</p>
                 </div>
             </div>
         </main>
