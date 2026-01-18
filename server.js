@@ -105,22 +105,52 @@ const fetchUrlText = (url) => {
 // Summarize Endpoint using Gemini API (Inference Mode)
 app.post('/api/summarize', express.json(), async (req, res) => {
     const { url, title, description } = req.body;
-    const GEMINI_API_KEY = "AIzaSyA2H6e4JwBbLzTmqg-Gev0QuSTpMl3WHMY"; // Hardcoded as requested
-
+    const GEMINI_API_KEY = "AIzaSyA2H6e4JwBbLzTmqg-Gev0QuSTpMl3WHMY";
     console.log(`[Gemini] Requesting summary for: ${title}`);
 
     try {
-        // Skip scraping. Use Title and Description directly.
-        // Prompt for inference summary (approx 30 chars)
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+        const prompt = `以下のニュースタイトルの内容を推測し、**30文字程度の日本語**で簡潔に要約・解説してください。\n\nニュースタイトル: ${title}\n補足情報: ${description}\n\n出力例: AI技術が新薬開発を加速、コスト削減へ。`;
+        const payload = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
 
-        // Context: Infer content from headline
-        const prompt = `以下のニュースタイトルの内容を推測し、**30文字程度の日本語**で簡潔に要約・解説してください。
-        
-ニュースタイトル: ${title}
-補足情報: ${description}
+        const geminiReq = https.request(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (geminiRes) => {
+            let data = '';
+            geminiRes.on('data', c => data += c);
+            geminiRes.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    if (json.candidates?.[0]?.content?.parts?.[0]?.text) {
+                        res.json({ summary: json.candidates[0].content.parts[0].text });
+                    } else {
+                        res.status(500).json({ error: "No summary", details: json });
+                    }
+                } catch (e) { res.status(500).json({ error: "Parse error" }); }
+            });
+        });
+        geminiReq.on('error', e => res.status(500).json({ error: "Network error" }));
+        geminiReq.write(payload);
+        geminiReq.end();
+    } catch (e) { res.status(500).json({ error: "Server error" }); }
+});
 
-出力例: AI技術が新薬開発を加速、コスト削減へ。`;
+// Ranking Endpoint
+app.post('/api/rank', express.json(), async (req, res) => {
+    const { items } = req.body; // Expecting array of {id, title, description}
+    const GEMINI_API_KEY = "AIzaSyA2H6e4JwBbLzTmqg-Gev0QuSTpMl3WHMY";
+
+    console.log(`[Gemini] Ranking ${items.length} items...`);
+
+    try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+
+        // Construct a list string for the prompt
+        const itemsList = items.map(item => `ID:${item.id} Title:${item.title}`).join('\n');
+
+        const prompt = `あなたはチーフエコノミストです。以下のニュース記事リストを、エコノミストの視点で「市場や経済への影響が大きい順」にランク付けし、上位5つのIDをJSON配列で返してください。
+理由などは不要です。純粋なJSON配列のみを返してください。例: [10, 2, 5, 8, 1]
+
+ニュースリスト:
+${itemsList}`;
 
         const payload = JSON.stringify({
             contents: [{
@@ -130,50 +160,40 @@ app.post('/api/summarize', express.json(), async (req, res) => {
 
         const geminiReq = https.request(geminiUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(payload)
-            }
+            headers: { 'Content-Type': 'application/json' }
         }, (geminiRes) => {
             let data = '';
-            geminiRes.on('data', (chunk) => { data += chunk; });
+            geminiRes.on('data', c => data += c);
             geminiRes.on('end', () => {
-                console.log(`[Gemini] Response Code: ${geminiRes.statusCode}`);
-
+                console.log(`[Gemini] Rank response: ${geminiRes.statusCode}`);
                 try {
                     const json = JSON.parse(data);
-
-                    if (geminiRes.statusCode !== 200) {
-                        console.error('[Gemini] API Error:', JSON.stringify(json, null, 2));
-                        res.status(geminiRes.statusCode).json({ error: "Gemini API Error", details: json });
-                        return;
-                    }
-
-                    if (json.candidates && json.candidates[0] && json.candidates[0].content) {
-                        const summary = json.candidates[0].content.parts[0].text;
-                        console.log(`[Gemini] Summary generated: ${summary}`);
-                        res.json({ summary: summary });
+                    const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) {
+                        // Extract array from text (it might have markdown code blocks)
+                        const match = text.match(/\[.*\]/s);
+                        if (match) {
+                            const rankedIds = JSON.parse(match[0]);
+                            console.log(`[Gemini] Ranked IDs: ${rankedIds}`);
+                            res.json({ rankedIds });
+                        } else {
+                            throw new Error("No JSON array found in response");
+                        }
                     } else {
-                        console.error('[Gemini] Unexpected format:', JSON.stringify(json, null, 2));
-                        res.status(500).json({ error: "No summary generated", details: json });
+                        res.status(500).json({ error: "No ranking generated" });
                     }
                 } catch (e) {
-                    console.error('[Gemini] Parse Error:', e, 'Raw Data:', data);
-                    res.status(500).json({ error: "Failed to parse Gemini response" });
+                    console.error("Rank parse error", e, data);
+                    res.status(500).json({ error: "Failed to parse ranking" });
                 }
             });
         });
-
-        geminiReq.on('error', (e) => {
-            console.error('[Gemini] Network Error:', e);
-            res.status(500).json({ error: "Gemini API request failed" });
-        });
-
+        geminiReq.on('error', e => res.status(500).json({ error: "Network error" }));
         geminiReq.write(payload);
         geminiReq.end();
 
-    } catch (error) {
-        console.error('[Gemini] Server Error:', error);
+    } catch (e) {
+        console.error(e);
         res.status(500).json({ error: "Server error" });
     }
 });
