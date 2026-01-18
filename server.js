@@ -16,22 +16,112 @@ app.get('/api/news', (req, res) => {
 
     https.get(url, (response) => {
         let data = '';
-
-        // A chunk of data has been received.
-        response.on('data', (chunk) => {
-            data += chunk;
-        });
-
-        // The whole response has been received.
+        response.on('data', (chunk) => { data += chunk; });
         response.on('end', () => {
             res.set('Content-Type', 'application/xml');
             res.send(data);
         });
-
     }).on("error", (err) => {
         console.log("Error: " + err.message);
         res.status(500).send("Error fetching news");
     });
+});
+
+// Helper to fetch text from URL (Simple implementation)
+const fetchUrlText = (url) => {
+    return new Promise((resolve, reject) => {
+        const protocol = url.startsWith('https') ? https : require('http');
+        const req = protocol.get(url, (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                // Follow redirect
+                fetchUrlText(res.headers.location).then(resolve).catch(reject);
+                return;
+            }
+
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                // Very basic HTML text extraction
+                const text = data.replace(/<script[^>]*>([\s\S]*?)<\/script>/gmi, "")
+                    .replace(/<style[^>]*>([\s\S]*?)<\/style>/gmi, "")
+                    .replace(/<[^>]+>/g, " ")
+                    .replace(/\s+/g, " ")
+                    .trim();
+                resolve(text);
+            });
+        });
+        req.on('error', (e) => resolve("")); // Resolve empty on error to fallback
+        req.setTimeout(5000, () => {
+            req.abort();
+            resolve("");
+        });
+    });
+};
+
+// Summarize Endpoint using Gemini API
+app.post('/api/summarize', express.json(), async (req, res) => {
+    const { url, title, description } = req.body;
+    const GEMINI_API_KEY = "AIzaSyA2H6e4JwBbLzTmqg-Gev0QuSTpMl3WHMY"; // Hardcoded as requested
+
+    try {
+        // 1. Fetch content (Try to get article body, fallback to description)
+        let articleText = await fetchUrlText(url);
+
+        // Validation: If text is too short or empty, use the provided description + title
+        if (!articleText || articleText.length < 200) {
+            articleText = `Title: ${title}\nDescription: ${description}`;
+        } else {
+            // Truncate to avoid token limits (approx 10000 chars)
+            articleText = articleText.substring(0, 10000);
+        }
+
+        // 2. Call Gemini API
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        const prompt = `以下のニュース記事の内容を、日本語で200文字以内に要約してください。重要なポイントを簡潔にまとめてください。\n\n記事本文:\n${articleText}`;
+
+        const payload = JSON.stringify({
+            contents: [{
+                parts: [{ text: prompt }]
+            }]
+        });
+
+        const geminiReq = https.request(geminiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        }, (geminiRes) => {
+            let data = '';
+            geminiRes.on('data', (chunk) => { data += chunk; });
+            geminiRes.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    if (json.candidates && json.candidates[0] && json.candidates[0].content) {
+                        const summary = json.candidates[0].content.parts[0].text;
+                        res.json({ summary: summary });
+                    } else {
+                        // If blocked or error
+                        res.status(500).json({ error: "No summary generated", details: json });
+                    }
+                } catch (e) {
+                    res.status(500).json({ error: "Failed to parse Gemini response" });
+                }
+            });
+        });
+
+        geminiReq.on('error', (e) => {
+            console.error(e);
+            res.status(500).json({ error: "Gemini API request failed" });
+        });
+
+        geminiReq.write(payload);
+        geminiReq.end();
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+    }
 });
 
 app.get('/', (req, res) => {

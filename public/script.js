@@ -132,23 +132,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Check for image enclosure (optional enhancement, but keeping simple for now)
                 // New Split Layout
+                const summaryId = `summary-${items.indexOf(item)}`;
+
                 card.innerHTML = `
                     <div class="card-main">
                         <div class="card-date">${dateStr}</div>
                         <h3>${title}</h3>
                         <div class="card-source">${source}</div>
                     </div>
-                    <div class="card-summary">
-                        <h4>記事の要約</h4>
-                        <p>${description}</p>
+                    <div class="card-summary" id="${summaryId}">
+                        <h4>AI要約 (生成中...)</h4>
+                        <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
                     </div>
                 `;
 
                 newsGrid.appendChild(card);
+
+                // Trigger Async Summary
+                fetchSummary(link, title, description, summaryId);
+
             } catch (e) {
                 console.warn('Error parsing item', e);
             }
         });
+    }
+
+    async function fetchSummary(url, title, description, elementId) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        try {
+            // Delay to avoid hitting rate limits instantly
+            await new Promise(r => setTimeout(r, Math.random() * 2000));
+
+            const res = await fetch('/api/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, title, description })
+            });
+
+            if (!res.ok) throw new Error('API Error');
+            const data = await res.json();
+
+            if (data.summary) {
+                element.innerHTML = `
+                    <h4>AI要約</h4>
+                    <p>${data.summary}</p>
+                `;
+            } else {
+                throw new Error('No summary');
+            }
+
+        } catch (e) {
+            console.warn('Summary failed', e);
+            // Fallback to RSS description
+            element.innerHTML = `
+                <h4>要約 (AI生成失敗)</h4>
+                <p>${description}</p>
+            `;
+        }
     }
 
     function renderRanking(items, period) {
