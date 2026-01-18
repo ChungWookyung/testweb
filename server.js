@@ -165,8 +165,8 @@ app.post('/api/summarize', express.json(), async (req, res) => {
     };
 
     try {
-        // STRICTLY use gemini-2.5-flash-lite only. No fallback.
-        let data = await callGeminiSummary('gemini-2.5-flash-lite');
+        // STRICTLY use gemini-3-flash only.
+        let data = await callGeminiSummary('gemini-3-flash');
 
         const json = JSON.parse(data);
         if (json.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -225,9 +225,9 @@ ${itemsList}`;
     };
 
     try {
-        // STRICTLY use gemini-2.5-flash-lite only. No fallback.
-        console.log("Attempting ranking with gemini-2.5-flash-lite...");
-        let data = await callGeminiRanking('gemini-2.5-flash-lite');
+        // STRICTLY use gemini-3-flash only.
+        console.log("Attempting ranking with gemini-3-flash...");
+        let data = await callGeminiRanking('gemini-3-flash');
 
         const json = JSON.parse(data);
         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
