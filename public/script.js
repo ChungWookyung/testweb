@@ -216,51 +216,119 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderRanking(items, period) {
-        rankingList.innerHTML = '';
+    async function renderRanking(items, period) {
+        rankingList.innerHTML = `
+            <div style="padding: 2rem; text-align: center;">
+                <div class="spinner" style="width:24px; height:24px; border-width:2px; margin: 0 auto 10px;"></div>
+                <div style="font-size:0.8rem; color:#666;">エコノミストAIが分析中...</div>
+            </div>
+        `;
+
         const now = new Date();
 
-        // Filter Items by Date
+        // 1. Filter Items by Date
         const filteredItems = items.filter(item => {
             const pubDate = new Date(item.querySelector('pubDate').textContent);
             const diffTime = Math.abs(now - pubDate);
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-            if (period === 'today') return diffDays <= 1; // within 24h
+            if (period === 'today') return diffDays <= 1;
             if (period === 'week') return diffDays <= 7;
             if (period === 'month') return diffDays <= 30;
             return true;
         });
 
-        // Use top 5 of filtered items
-        const topItems = filteredItems.slice(0, 5);
-
-        if (topItems.length === 0) {
+        if (filteredItems.length === 0) {
             rankingList.innerHTML = '<li style="padding:1rem; color:#666; font-size:0.8rem;">該当する記事がありません</li>';
             return;
         }
 
-        topItems.forEach((item) => {
+        // 2. Prepare Payload (Limit to top 20 candidates to rank)
+        const candidates = filteredItems.slice(0, 20).map((item, index) => {
             const title = item.querySelector('title').textContent;
-            const link = item.querySelector('link').textContent;
-
-            // Clean title (remove source suffix often added by Google like " - Media Name")
-            let cleanTitle = title;
-            const hyphenIndex = title.lastIndexOf(' - ');
-            if (hyphenIndex > 0) cleanTitle = title.substring(0, hyphenIndex);
-
-            const li = document.createElement('li');
-            li.className = 'ranking-item';
-            li.onclick = () => window.open(link, '_blank');
-
-            li.innerHTML = `
-                <div class="ranking-rank"></div>
-                <div class="ranking-content">
-                    <div class="ranking-title">${cleanTitle}</div>
-                </div>
-            `;
-            rankingList.appendChild(li);
+            return { id: index, title: title }; // Using index in filtered array as ID
         });
+
+        try {
+            // 3. Call AI Ranking API
+            const response = await fetch('/api/rank', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: candidates })
+            });
+
+            if (!response.ok) throw new Error("Ranking failed");
+
+            const data = await response.json();
+            const rankedIds = data.rankedIds || [];
+
+            // 4. Sort items based on returned IDs
+            // If ID not in list, put at bottom
+            const sortedItems = [];
+            rankedIds.forEach(id => {
+                if (filteredItems[id]) {
+                    sortedItems.push(filteredItems[id]);
+                }
+            });
+
+            // Fill remaining if less than 5 returned (though prompt asks for 5)
+            // or if API failed to return valid IDs. 
+            // Also ensure we have unique items.
+            const seenLinks = new Set(sortedItems.map(i => i.querySelector('link').textContent));
+            filteredItems.forEach(item => {
+                const link = item.querySelector('link').textContent;
+                if (!seenLinks.has(link) && sortedItems.length < 5) {
+                    sortedItems.push(item);
+                }
+            });
+
+            // 5. Render Top 5
+            rankingList.innerHTML = '';
+            sortedItems.slice(0, 5).forEach((item) => {
+                const title = item.querySelector('title').textContent;
+                const link = item.querySelector('link').textContent;
+
+                let cleanTitle = title;
+                const hyphenIndex = title.lastIndexOf(' - ');
+                if (hyphenIndex > 0) cleanTitle = title.substring(0, hyphenIndex);
+
+                const li = document.createElement('li');
+                li.className = 'ranking-item';
+                li.onclick = () => window.open(link, '_blank');
+
+                li.innerHTML = `
+                    <div class="ranking-rank"></div>
+                    <div class="ranking-content">
+                        <div class="ranking-title">${cleanTitle}</div>
+                    </div>
+                `;
+                rankingList.appendChild(li);
+            });
+
+        } catch (e) {
+            console.error("Ranking Error", e);
+            // Fallback: Date Based (original logic)
+            rankingList.innerHTML = '';
+            filteredItems.slice(0, 5).forEach((item) => {
+                const title = item.querySelector('title').textContent;
+                const link = item.querySelector('link').textContent;
+                let cleanTitle = title;
+                const hyphenIndex = title.lastIndexOf(' - ');
+                if (hyphenIndex > 0) cleanTitle = title.substring(0, hyphenIndex);
+
+                const li = document.createElement('li');
+                li.className = 'ranking-item';
+                li.onclick = () => window.open(link, '_blank');
+
+                li.innerHTML = `
+                    <div class="ranking-rank"></div>
+                    <div class="ranking-content">
+                        <div class="ranking-title">${cleanTitle}</div>
+                    </div>
+                `;
+                rankingList.appendChild(li);
+            });
+        }
     }
 
     function showLoading() {
