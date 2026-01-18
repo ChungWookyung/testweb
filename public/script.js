@@ -5,7 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentTopicLabel = document.getElementById('current-topic');
     const categoryItems = document.querySelectorAll('.categories li');
 
-    // Default topic (Japanese)
+    // Ranking elements
+    const rankingList = document.getElementById('ranking-list');
+    const rankingTabs = document.querySelectorAll('.tab-btn');
+    let allNewsItems = []; // Store fetched items for ranking filtering
+
+    // Default topic
     let currentTopic = '人工知能';
 
     // Initial Fetch
@@ -19,15 +24,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     categoryItems.forEach(item => {
         item.addEventListener('click', () => {
-            // Update active state
             categoryItems.forEach(i => i.classList.remove('active'));
             item.classList.add('active');
 
-            // Search
             const topic = item.getAttribute('data-query');
             currentTopic = topic;
             currentTopicLabel.textContent = topic;
             fetchNews(topic);
+        });
+    });
+
+    // Ranking Tab Click
+    rankingTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            rankingTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            const period = tab.getAttribute('data-period');
+            // Update ranking list based on period using cached items
+            renderRanking(allNewsItems, period);
         });
     });
 
@@ -36,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (query) {
             currentTopic = query;
             currentTopicLabel.textContent = `検索: ${query}`;
-            // Reset active categories
             categoryItems.forEach(i => i.classList.remove('active'));
             fetchNews(query);
         }
@@ -53,8 +67,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
 
-            const items = xmlDoc.querySelectorAll('item');
+            const items = Array.from(xmlDoc.querySelectorAll('item'));
+
+            // Store for ranking usage
+            allNewsItems = items;
+
             renderNews(items);
+
+            // Render default ranking (Today)
+            const activeTab = document.querySelector('.tab-btn.active');
+            const period = activeTab ? activeTab.getAttribute('data-period') : 'today';
+            renderRanking(items, period);
 
         } catch (error) {
             console.error('Error fetching news:', error);
@@ -82,16 +105,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pubDate = item.querySelector('pubDate').textContent;
                 const descriptionRaw = item.querySelector('description').textContent;
 
+                // Parse Source
+                let source = "Googleニュース";
+                const sourceTag = item.querySelector('source');
+                if (sourceTag) {
+                    source = sourceTag.textContent;
+                }
+
+                // Clean description
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = descriptionRaw;
-                const description = tempDiv.textContent || tempDiv.innerText || '';
+                // Remove existing "View full coverage" links often found in Google RSS
+                const anchors = tempDiv.querySelectorAll('a');
+                anchors.forEach(a => a.remove());
+                let description = tempDiv.textContent || tempDiv.innerText || '';
+                if (description.length > 100) description = description.substring(0, 100) + '...';
 
                 const card = document.createElement('div');
                 card.className = 'card';
-                // Make entire card clickable
                 card.onclick = () => window.open(link, '_blank');
 
-                // Format Date (Japanese format)
                 const dateObj = new Date(pubDate);
                 const dateStr = dateObj.toLocaleDateString('ja-JP', {
                     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -102,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="card-date">${dateStr}</div>
                         <h3>${title}</h3>
                         <p>${description}</p>
+                        <div class="card-source">${source}</div>
                     </div>
                 `;
 
@@ -112,11 +146,58 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function renderRanking(items, period) {
+        rankingList.innerHTML = '';
+        const now = new Date();
+
+        // Filter Items by Date
+        const filteredItems = items.filter(item => {
+            const pubDate = new Date(item.querySelector('pubDate').textContent);
+            const diffTime = Math.abs(now - pubDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (period === 'today') return diffDays <= 1; // within 24h
+            if (period === 'week') return diffDays <= 7;
+            if (period === 'month') return diffDays <= 30;
+            return true;
+        });
+
+        // Use top 5 of filtered items
+        const topItems = filteredItems.slice(0, 5);
+
+        if (topItems.length === 0) {
+            rankingList.innerHTML = '<li style="padding:1rem; color:#666; font-size:0.8rem;">該当する記事がありません</li>';
+            return;
+        }
+
+        topItems.forEach((item) => {
+            const title = item.querySelector('title').textContent;
+            const link = item.querySelector('link').textContent;
+
+            // Clean title (remove source suffix often added by Google like " - Media Name")
+            let cleanTitle = title;
+            const hyphenIndex = title.lastIndexOf(' - ');
+            if (hyphenIndex > 0) cleanTitle = title.substring(0, hyphenIndex);
+
+            const li = document.createElement('li');
+            li.className = 'ranking-item';
+            li.onclick = () => window.open(link, '_blank');
+
+            li.innerHTML = `
+                <div class="ranking-rank"></div>
+                <div class="ranking-content">
+                    <div class="ranking-title">${cleanTitle}</div>
+                </div>
+            `;
+            rankingList.appendChild(li);
+        });
+    }
+
     function showLoading() {
         newsGrid.innerHTML = `
             <div class="loading-state">
                 <div class="spinner"></div>
-                <p>最新ニュースを取得中...</p>
+                <p>紙面を更新中...</p>
             </div>
         `;
     }
