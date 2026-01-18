@@ -113,13 +113,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Clean description
+                // Clean description (Fix: Do not remove anchor nodes, just get text)
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = descriptionRaw;
-                // Remove existing "View full coverage" links often found in Google RSS
-                const anchors = tempDiv.querySelectorAll('a');
-                anchors.forEach(a => a.remove());
+                // Just get text content, which strips tags but keeps text
                 let description = tempDiv.textContent || tempDiv.innerText || '';
-                if (description.length > 100) description = description.substring(0, 100) + '...';
+                // Clean up whitespace
+                description = description.replace(/\s+/g, ' ').trim();
+
+                // Clean title (remove source suffix if present for better AI context)
+                let cleanTitle = title;
+                const hyphenIndex = title.lastIndexOf(' - ');
+                if (hyphenIndex > 0) cleanTitle = title.substring(0, hyphenIndex);
 
                 const card = document.createElement('div');
                 card.className = 'card';
@@ -137,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.innerHTML = `
                     <div class="card-main">
                         <div class="card-date">${dateStr}</div>
-                        <h3>${title}</h3>
+                        <h3>${title}</h3> <!-- Display full title in UI -->
                         <div class="card-source">${source}</div>
                     </div>
                     <div class="card-summary" id="${summaryId}">
@@ -148,8 +153,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 newsGrid.appendChild(card);
 
-                // Trigger Async Summary
-                fetchSummary(link, title, description, summaryId);
+                // Trigger Async Summary with CLEAN Title and FULL Description text
+                // Pass cleanTitle for better inference
+                fetchSummary(link, cleanTitle, description, summaryId);
 
             } catch (e) {
                 console.warn('Error parsing item', e);
