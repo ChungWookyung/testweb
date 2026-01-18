@@ -21,15 +21,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Sidebar Toggle Logic
+    // Sidebar Toggle Logic (Updated for Nested Structure)
     const sectionTitles = document.querySelectorAll('.section-title');
     sectionTitles.forEach(title => {
         title.addEventListener('click', () => {
-            // Find the next sibling UL
-            const list = title.nextElementSibling;
-            if (list && list.classList.contains('categories')) {
-                list.classList.toggle('collapsed');
-                title.classList.toggle('collapsed');
-            }
+            const section = title.parentElement;
+            // Toggle all categories lists within this section
+            const categories = section.querySelectorAll('.categories');
+            categories.forEach(cat => cat.classList.toggle('collapsed'));
+
+            // Toggle title arrow
+            title.classList.toggle('collapsed');
         });
     });
 
@@ -362,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const diffTime = Math.abs(now - pubDate);
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-                    if (period === 'today') return diffDays <= 1;
+                    if (period === 'today') return diffDays <= 2; // Relaxed
                     if (period === 'week') return diffDays <= 7;
                     if (period === 'month') return diffDays <= 30;
                     return true;
@@ -373,67 +375,66 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (filteredItems.length === 0) {
-                // Fallback: If no items match "Today", try showing general top items or message
-                // For now, consistent message
                 rankingList.innerHTML = '<li style="padding:1rem; color:#666; font-size:0.8rem;">期間内の記事が見つかりませんでした</li>';
                 return;
             }
 
-            // 2. Prepare Payload (Limit to top 20 candidates to rank)
-            const candidates = filteredItems.slice(0, 20).map((item, index) => {
-                const titleNode = item.querySelector('title');
-                const title = titleNode ? titleNode.textContent : "No Title";
-                return { id: index, title: title }; // Using index in filtered array as ID
+            // 2. Prepare Payload
+            const candidates = filteredItems.slice(0, 15).map((item, index) => {
+                const title = item.querySelector('title')?.textContent || "No Title";
+                return { id: index, title: title };
             });
 
             // 3. Call AI Ranking API
             let rankedIds = [];
             try {
+                // If API key is missing on server, this will fail or return error json.
+                // We expect 500 error currently.
                 const response = await fetch('/api/rank', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ items: candidates })
                 });
 
-                if (!response.ok) throw new Error("Ranking request failed");
-                const data = await response.json();
-                rankedIds = data.rankedIds || [];
+                if (response.ok) {
+                    const data = await response.json();
+                    rankedIds = data.rankedIds || [];
+                } else {
+                    console.warn("Ranking API returned error status:", response.status);
+                }
             } catch (apiError) {
                 console.warn("Ranking API failed, falling back to date order", apiError);
-                // Fallback to empty array to trigger client-side fallback logic below
             }
 
-            // 4. Sort items based on returned IDs
+            // 4. Construct Sorted List
             const sortedItems = [];
+
+            // If AI returned a valid list, use it
             if (rankedIds.length > 0) {
                 rankedIds.forEach(id => {
                     if (filteredItems[id]) {
                         sortedItems.push(filteredItems[id]);
                     }
                 });
-            } else {
-                // If API failed or returned explicit empty, use filteredItems as is (Date sorted usually)
-                // Filtered items are already in RSS order (Date Descending usually)
-                sortedItems.push(...filteredItems.slice(0, 5));
             }
 
-            // Fill remaining if needed (deduplication)
-            const seenLinks = new Set(sortedItems.map(i => i.querySelector('link') ? i.querySelector('link').textContent : ""));
-            filteredItems.forEach(item => {
-                const link = item.querySelector('link') ? item.querySelector('link').textContent : "";
-                if (!seenLinks.has(link) && sortedItems.length < 5) {
-                    sortedItems.push(item);
+            // FALLBACK / FILLER:
+            // Ensure we have at least 5 items (or max available)
+            // If sortedItems is empty (API failed), this fills it completely with the newest items.
+            if (sortedItems.length < 5) {
+                for (const item of filteredItems) {
+                    if (sortedItems.length >= 5) break;
+                    if (!sortedItems.includes(item)) {
+                        sortedItems.push(item);
+                    }
                 }
-            });
+            }
 
             // 5. Render Top 5
             rankingList.innerHTML = '';
-            sortedItems.slice(0, 5).forEach((item) => {
-                const titleNode = item.querySelector('title');
-                const linkNode = item.querySelector('link');
-
-                const title = titleNode ? titleNode.textContent : "無題";
-                const link = linkNode ? linkNode.textContent : "#";
+            sortedItems.slice(0, 5).forEach((item, index) => {
+                const title = item.querySelector('title')?.textContent || "無題";
+                const link = item.querySelector('link')?.textContent || "#";
 
                 let cleanTitle = title;
                 const hyphenIndex = title.lastIndexOf(' - ');
@@ -444,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 li.onclick = () => window.open(link, '_blank');
 
                 li.innerHTML = `
-                    <div class="ranking-rank"></div>
+                    <div class="ranking-rank">${index + 1}</div>
                     <div class="ranking-content">
                         <div class="ranking-title">${cleanTitle}</div>
                     </div>
