@@ -11,8 +11,147 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const getGeminiModel = () => {
     if (!GEMINI_API_KEY) throw new Error("API Key missing");
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    return genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    return genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 };
+
+const cron = require('node-cron');
+const nodemailer = require('nodemailer');
+const Parser = require('rss-parser');
+
+// Read Email Config
+let EMAIL_CONFIG = null;
+try {
+    const configPath = path.join(__dirname, 'email_config.json');
+    if (fs.existsSync(configPath)) {
+        EMAIL_CONFIG = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    } else {
+        console.warn("Warning: email_config.json not found. Email features will not work.");
+    }
+} catch (error) {
+    console.error("Failed to read email_config.json:", error);
+}
+
+// Read Mailing List
+const getMailingList = () => {
+    try {
+        const listPath = path.join(__dirname, 'mail-list.txt');
+        if (fs.existsSync(listPath)) {
+            return fs.readFileSync(listPath, 'utf-8')
+                .split('\n')
+                .map(email => email.trim())
+                .filter(email => email && email.includes('@')); // Simple validation
+        }
+    } catch (error) {
+        console.error("Failed to read mail-list.txt:", error);
+    }
+    return [];
+};
+
+// Daily News Email Task
+const sendDailyNewsEmail = async () => {
+    console.log("Starting daily news email task...");
+
+    if (!EMAIL_CONFIG || !EMAIL_CONFIG.auth || !EMAIL_CONFIG.auth.user) {
+        console.error("Email configuration missing. Skipping task.");
+        return;
+    }
+
+    if (!GEMINI_API_KEY) {
+        console.error("Gemini API Key missing. Skipping task.");
+        return;
+    }
+
+    const recipients = getMailingList();
+    if (recipients.length === 0) {
+        console.warn("No recipients found in mail-list.txt. Skipping task.");
+        return;
+    }
+
+    try {
+        // 1. Fetch News (Japan Economy context)
+        const parser = new Parser();
+        // search for "日本 経済" (Japan Economy) to ensure relevance for economists
+        const feedUrl = 'https://news.google.com/rss/search?q=%E6%97%A5%E6%9C%AC%20%E7%BB%8F%E6%B5%8E&hl=ja&gl=JP&ceid=JP:ja';
+        const feed = await parser.parseURL(feedUrl);
+
+        // 2. Filter for "New!" (Last 24 hours)
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const newArticles = feed.items.filter(item => {
+            const pubDate = new Date(item.pubDate);
+            return pubDate >= oneDayAgo;
+        });
+
+        if (newArticles.length === 0) {
+            console.log("No new articles found in the last 24 hours.");
+            return;
+        }
+
+        console.log(`Found ${newArticles.length} new articles.`);
+
+        // 3. Select Top 5 & Summarize via Gemini
+        const model = getGeminiModel();
+
+        // Prepare list for prompt (Title + Link + Snippet if available)
+        const articlesListText = newArticles.map((item, index) => {
+            return `${index + 1}. ${item.title}`;
+        }).join('\n');
+
+        const prompt = `
+あなたは優秀な経済アナリストのアシスタントです。
+以下のニュース記事リスト（過去24時間以内）から、**エコノミストにとって最も重要で注目すべき5つのニュース**を選出してください。
+
+選出した各ニュースについて、以下の形式で出力してください：
+1. ニュースのタイトル
+2. そのニュースの要約（日本語、50〜100文字程度）
+
+ニュースリスト:
+${articlesListText}
+`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const emailBodyContent = response.text();
+
+        // 4. Send Email
+        const transporter = nodemailer.createTransport({
+            service: EMAIL_CONFIG.service,
+            auth: EMAIL_CONFIG.auth
+        });
+
+        const mailOptions = {
+            from: EMAIL_CONFIG.auth.user,
+            bcc: recipients, // Use BCC to hide recipients from each other
+            subject: `【日刊】エコノミスト向け重要ニュースまとめ (${new Date().toLocaleDateString('ja-JP')})`,
+            text: `おはようございます。\n\n本日のエコノミスト向け重要ニュースをお届けします。\n\n${emailBodyContent}\n\n---\nAI News Bot`
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email sent: ' + info.response);
+
+    } catch (error) {
+        console.error("Error in daily news email task:", error);
+    }
+};
+
+// Schedule task for 8:00 AM JST
+// Cron syntax: Second Minute Hour Day Month DayOfWeek
+cron.schedule('0 0 8 * * *', () => {
+    console.log("Running scheduled task: Daily News Email");
+    sendDailyNewsEmail();
+}, {
+    timezone: "Asia/Tokyo"
+});
+
+// Test endpoint to trigger email manually (for verification)
+app.post('/api/test-email', async (req, res) => {
+    console.log("Manual trigger of daily news email...");
+    try {
+        await sendDailyNewsEmail();
+        res.json({ message: "Email task triggered. Check server logs for details." });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // Read API Key from api.txt (prevents hardcoding)
 let GEMINI_API_KEY = "";
