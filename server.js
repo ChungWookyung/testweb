@@ -102,26 +102,23 @@ const fetchUrlText = (url) => {
     });
 };
 
-// Summarize Endpoint using Gemini API
+// Summarize Endpoint using Gemini API (Inference Mode)
 app.post('/api/summarize', express.json(), async (req, res) => {
     const { url, title, description } = req.body;
     const GEMINI_API_KEY = "AIzaSyA2H6e4JwBbLzTmqg-Gev0QuSTpMl3WHMY"; // Hardcoded as requested
 
     try {
-        // 1. Fetch content (Try to get article body, fallback to description)
-        let articleText = await fetchUrlText(url);
-
-        // Validation: If text is too short or empty, use the provided description + title
-        if (!articleText || articleText.length < 200) {
-            articleText = `Title: ${title}\nDescription: ${description}`;
-        } else {
-            // Truncate to avoid token limits (approx 10000 chars)
-            articleText = articleText.substring(0, 10000);
-        }
-
-        // 2. Call Gemini API
+        // Skip scraping. Use Title and Description directly.
+        // Prompt for inference summary (approx 30 chars)
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-        const prompt = `以下のニュース記事の内容を、日本語で200文字以内に要約してください。重要なポイントを簡潔にまとめてください。\n\n記事本文:\n${articleText}`;
+
+        // Context: Infer content from headline
+        const prompt = `以下のニュースタイトルの内容を推測し、**30文字程度の日本語**で簡潔に要約・解説してください。
+        
+ニュースタイトル: ${title}
+補足情報: ${description}
+
+出力例: AI技術が新薬開発を加速、コスト削減へ。`;
 
         const payload = JSON.stringify({
             contents: [{
