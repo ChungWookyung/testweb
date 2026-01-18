@@ -26,8 +26,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Proxy endpoint to fetch Google News RSS
 app.get('/api/news', (req, res) => {
     const query = req.query.q || 'Artificial Intelligence';
-    // Google News RSS URL (Japanese)
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ja&gl=JP&ceid=JP:ja`;
+    const region = req.query.region || 'jp';
+
+    let url = '';
+
+    if (region === 'us') {
+        // English (US)
+        url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+    } else {
+        // Japanese (Default)
+        url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ja&gl=JP&ceid=JP:ja`;
+    }
 
     https.get(url, (response) => {
         let data = '';

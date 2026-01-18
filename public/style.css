@@ -442,32 +442,42 @@ body {
         gap: 1rem;
     }
 
-    /* AI Summary Button */
+    /* AI Summary Button (Nikkei Style) */
     .ai-summary-btn {
-        background: linear-gradient(135deg, #005596 0%, #0077b6 100%);
+        background-color: #0d47a1;
+        /* Professional Dark Blue */
         color: white;
         border: none;
-        padding: 0.6rem 1rem;
-        border-radius: 2rem;
+        padding: 0.5rem 1rem;
+        border-radius: 2px;
+        /* Squared corners */
         cursor: pointer;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         font-weight: 700;
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        transition: all 0.2s ease;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: background-color 0.2s ease;
+        box-shadow: none;
+        /* No shadow */
         margin: auto 0;
-        /* Center vertically if needed */
+        font-family: var(--font-serif);
+        /* Use serif for more "paper" feel */
+        letter-spacing: 0.05em;
     }
 
     .ai-summary-btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        background-color: #002171;
+        /* Darker blue on hover */
+        transform: none;
+        /* No movement */
+        box-shadow: none;
     }
 
-    .ai-summary-btn:active {
-        transform: translateY(0);
+    .ai-summary-btn .material-icons {
+        font-size: 14px;
+        /* Smaller icon */
+        opacity: 0.8;
     }
 
     .card-summary {
