@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // State for pagination
     let allCurrentItems = [];
     let displayedCount = 0;
-    const ITEMS_PER_PAGE = 20;
+    const ITEMS_PER_PAGE = 10;
 
     async function fetchNews(query, region = 'jp', type = 'normal', customUrl = null) {
         showLoading();
@@ -226,27 +226,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                 });
 
-                // Check used ID for summary to be unique based on global link or title hash ideally, 
-                // but simple index in batch + offset is okay? No, index in allCurrentItems is better.
                 const totalIndex = allCurrentItems.indexOf(item);
                 const summaryId = `summary-${totalIndex}`;
-                // Auto summary only for the very first 5 items globally
-                const isAutoSummary = totalIndex < 5;
 
-                let summaryHtml = '';
-                if (isAutoSummary) {
-                    summaryHtml = `
-                        <h4>AI要約 (生成中...)</h4>
-                        <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
-                    `;
-                } else {
-                    summaryHtml = `
-                        <button class="ai-summary-btn" onclick="requestSummary(event, '${link}', '${cleanTitle.replace(/'/g, "\\'")}', '${description.replace(/'/g, "\\'")}', '${summaryId}')">
-                            <span class="material-icons" style="font-size:16px; vertical-align:middle;">auto_awesome</span>
-                            AIで要約する
-                        </button>
-                    `;
-                }
+                // ALWAYS Auto Summary
+                const summaryHtml = `
+                    <h4>AI要約 (生成中...)</h4>
+                    <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                `;
 
                 card.innerHTML = `
                     <div class="card-main">
@@ -264,9 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 newsGrid.appendChild(card);
 
-                if (isAutoSummary) {
-                    fetchSummary(link, cleanTitle, description, summaryId);
-                }
+                // Auto trigger summary for EVERY item
+                fetchSummary(link, cleanTitle, description, summaryId);
 
             } catch (e) {
                 console.warn('Error parsing item', e);
