@@ -76,44 +76,42 @@ document.addEventListener('DOMContentLoaded', () => {
     let displayedCount = 0;
     const ITEMS_PER_PAGE = 10;
 
+    // Helper to fetch RSS items (Reusable)
+    async function fetchRSSItems(query, region, type, customUrl, noFilter = false) {
+        let apiUrl = `/api/news?q=${encodeURIComponent(query)}&region=${region}`;
+        if (type === 'custom' && customUrl) {
+            apiUrl += `&url=${encodeURIComponent(customUrl)}`;
+        }
+
+        const response = await fetch(apiUrl);
+        if (!response.ok) throw new Error('Network response was not ok');
+
+        const xmlText = await response.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+
+        let items = Array.from(xmlDoc.querySelectorAll('item'));
+
+        // Custom Source Filtering
+        if (type === 'custom' && !noFilter) {
+            const aiKeywords = /AI|Artificial Intelligence|Machine Learning|Deep Learning|Neural|LLM|GPT|Gemini|Claude|Intelligence|Robotics|Data Science|Algorithm|Economist|Technology|Innovation|Digital/i;
+            items = items.filter(item => {
+                const title = item.querySelector('title')?.textContent || '';
+                const desc = item.querySelector('description')?.textContent || '';
+                const content = title + " " + desc;
+                return aiKeywords.test(content);
+            });
+        }
+        return items;
+    }
+
     async function fetchNews(query, region = 'jp', type = 'normal', customUrl = null, noFilter = false) {
         showLoading();
 
         try {
-            let apiUrl = `/api/news?q=${encodeURIComponent(query)}&region=${region}`;
-            if (type === 'custom' && customUrl) {
-                apiUrl += `&url=${encodeURIComponent(customUrl)}`;
-            }
+            const items = await fetchRSSItems(query, region, type, customUrl, noFilter);
 
-            const response = await fetch(apiUrl);
-            if (!response.ok) throw new Error('Network response was not ok');
-
-            const xmlText = await response.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-
-            let items = Array.from(xmlDoc.querySelectorAll('item'));
-
-            // Custom Source Filtering (Client-side AI Filter for CEPR etc)
-            if (type === 'custom' && !noFilter) {
-                const aiKeywords = /AI|Artificial Intelligence|Machine Learning|Deep Learning|Neural|LLM|GPT|Gemini|Claude|Intelligence|Robotics|Data Science|Algorithm|Economist|Technology|Innovation|Digital/i;
-                // Expanded keywords slightly for "CEPR" context which is economic, so "Technology/Innovation" might be relevant overlap.
-                // User said "AI related", sticking mainly to AI but being slightly permissive.
-
-                items = items.filter(item => {
-                    const title = item.querySelector('title')?.textContent || '';
-                    const desc = item.querySelector('description')?.textContent || '';
-                    const content = title + " " + desc;
-                    return aiKeywords.test(content);
-                });
-
-                if (items.length === 0 && Array.from(xmlDoc.querySelectorAll('item')).length > 0) {
-                    // If we filtered everything out, maybe show a message?
-                    // For now, let it fall through to "No news found".
-                }
-            }
-
-            // 1. Sort by Date Descending (Newest first)
+            // 1. Sort by Date Descending
             items.sort((a, b) => {
                 const pubDateA = a.querySelector('pubDate')?.textContent;
                 const pubDateB = b.querySelector('pubDate')?.textContent;
@@ -122,18 +120,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return new Date(pubDateB) - new Date(pubDateA);
             });
 
-            // Store for ranking usage
-            allNewsItems = items;
-
             // Store for pagination
             allCurrentItems = items;
             displayedCount = 0;
 
             // Initial Render
-            newsGrid.innerHTML = ''; // Clear existing
+            newsGrid.innerHTML = '';
             renderNextBatch();
-
-
 
         } catch (error) {
             console.error('Error fetching news:', error);
@@ -323,8 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
-
     function showLoading() {
         newsGrid.innerHTML = `
             <div class="loading-state">
@@ -334,17 +325,52 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    // Expose requestSummary to window so onclick can see it
-    window.requestSummary = (event, link, title, desc, id) => {
-        event.stopPropagation(); // Prevent card click
+    // New Function: Check for Updates in Background
+    async function checkTopicUpdates() {
+        const categories = document.querySelectorAll('.categories li');
+        const now = new Date();
+        const oneDayMs = 24 * 60 * 60 * 1000;
 
-        const element = document.getElementById(id);
-        if (element) {
-            element.innerHTML = `
-                <h4>AI要約 (生成中...)</h4>
-                <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
-            `;
-            fetchSummary(link, title, desc, id);
+        for (const item of categories) {
+            const query = item.getAttribute('data-query');
+            const region = item.getAttribute('data-region') || 'jp';
+            const type = item.getAttribute('data-type');
+            const customUrl = item.getAttribute('data-url');
+            const noFilter = item.getAttribute('data-no-filter') === 'true';
+
+            // Skip current active topic to avoid double fetch if just loaded? 
+            // Better to show the count anyway for consistency.
+
+            try {
+                // Gentle delay between requests to avoid 429
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                const items = await fetchRSSItems(query, region, type, customUrl, noFilter);
+
+                let newCount = 0;
+                items.forEach(article => {
+                    const pubDateNode = article.querySelector('pubDate');
+                    if (pubDateNode) {
+                        const date = new Date(pubDateNode.textContent);
+                        if (!isNaN(date) && (now - date) < oneDayMs) {
+                            newCount++;
+                        }
+                    }
+                });
+
+                if (newCount > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'update-count';
+                    badge.innerHTML = `+${newCount}`;
+                    item.appendChild(badge);
+                }
+
+            } catch (err) {
+                console.warn(`Update check failed for ${query}`, err);
+            }
         }
-    };
+    }
+
+    // Call update check after initial load
+    setTimeout(checkTopicUpdates, 2000);
 });
