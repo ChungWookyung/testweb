@@ -12,6 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentRegion = 'jp';
 
     // Initial Fetch
+    // Find initial active item to set the correct title
+    const initialActiveDetails = document.querySelector('.categories li.active');
+    if (initialActiveDetails) {
+        currentTopicLabel.textContent = initialActiveDetails.firstChild.textContent.trim();
+        currentTopic = initialActiveDetails.getAttribute('data-query');
+    }
+
     fetchNews(currentTopic, currentRegion);
 
     // Event Listeners
