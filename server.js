@@ -138,7 +138,8 @@ app.post('/api/summarize', express.json(), async (req, res) => {
 
     try {
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
-        const prompt = `以下のニュースタイトルの内容を推測し、**30文字程度の日本語**で簡潔に要約・解説してください。\n\nニュースタイトル: ${title}\n補足情報: ${description}\n\n出力例: AI技術が新薬開発を加速、コスト削減へ。`;
+        // Changed prompt to request 50-100 characters
+        const prompt = `以下のニュースタイトルの内容を推測し、**50文字以上100文字未満の日本語**で簡潔に要約・解説してください。\n\nニュースタイトル: ${title}\n補足情報: ${description}\n\n出力例: AI技術は新薬開発のスピードを劇的に向上させ、開発コストの大幅な削減に寄与しています。これにより、これまで治療法がなかった疾患への画期的なアプローチが期待されています。`;
         const payload = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
 
         const geminiReq = https.request(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (geminiRes) => {

@@ -14,7 +14,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial Fetch
     fetchNews(currentTopic, currentRegion);
 
-    // ... (rest) ...
+    // Event Listeners
+    searchBtn.addEventListener('click', () => handleSearch());
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSearch();
+    });
+
+    // Sidebar Toggle Logic
+    const sectionTitles = document.querySelectorAll('.section-title');
+    sectionTitles.forEach(title => {
+        title.addEventListener('click', () => {
+            // Find the next sibling UL
+            const list = title.nextElementSibling;
+            if (list && list.classList.contains('categories')) {
+                list.classList.toggle('collapsed');
+                title.classList.toggle('collapsed');
+            }
+        });
+    });
 
     categoryItems.forEach(item => {
         item.addEventListener('click', () => {

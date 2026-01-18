@@ -27,9 +27,12 @@
                 <button id="search-btn">
                     <span class="material-icons-round">search</span>
                 </button>
-                <nav class="sidebar">
-                    <!-- Japanese News Section -->
-                    <h3 class="section-title">日本のニュース</h3>
+            </div>
+
+            <nav class="sidebar-nav">
+                <!-- Japanese News Section -->
+                <div class="sidebar-section">
+                    <h3 class="section-title">日本のニュース<span class="toggle-icon">▼</span></h3>
                     <ul class="categories">
                         <li class="active" data-query="人工知能" data-region="jp">人工知能</li>
                         <li data-query="生成AI" data-region="jp">生成AI</li>
@@ -40,9 +43,11 @@
                         <li data-query="フィジカルAI" data-region="jp">フィジカルAI</li>
                         <li data-query="AI政策" data-region="jp">AI政策・規制</li>
                     </ul>
+                </div>
 
-                    <!-- World News Section -->
-                    <h3 class="section-title">世界のニュース</h3>
+                <!-- World News Section -->
+                <div class="sidebar-section">
+                    <h3 class="section-title">世界のニュース<span class="toggle-icon">▼</span></h3>
                     <ul class="categories">
                         <li data-query="Artificial Intelligence" data-region="us">Artificial Intelligence</li>
                         <li data-query="Generative AI" data-region="us">Generative AI</li>
@@ -52,12 +57,8 @@
                         <li data-query="Physical AI" data-region="us">Physical AI</li>
                         <li data-query="AI Regulation" data-region="us">AI Regulation</li>
                     </ul>
-                </nav>
-                <li data-query="OpenAI">OpenAI</li>
-                <li data-query="Google Gemini">Google Gemini</li>
-                <li data-query="半導体 AI">AI半導体</li>
-                </ul>
-                </nav>
+                </div>
+            </nav>
         </aside>
 
         <!-- Main Content -->

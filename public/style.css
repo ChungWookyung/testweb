@@ -104,17 +104,53 @@ body {
     background: #003366;
 }
 
-.categories h3 {
+.section-title {
     font-size: 0.85rem;
     font-weight: 700;
-    color: var(--text-muted);
-    margin-bottom: 0.8rem;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 0.2rem;
+    color: #005596;
+    /* Nikkei Blue */
+    margin: 1.5rem 0 0.5rem 0;
+    padding-left: 0.5rem;
+    border-left: 3px solid #005596;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    /* Clickable */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    padding-right: 1rem;
+}
+
+.toggle-icon {
+    font-size: 0.7rem;
+    transition: transform 0.3s ease;
+}
+
+.section-title.collapsed .toggle-icon {
+    transform: rotate(-90deg);
 }
 
 .categories ul {
     list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Collapsible state */
+.categories {
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    max-height: 500px;
+    /* Arbitrary large height */
+    opacity: 1;
+    overflow: hidden;
+}
+
+.categories.collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    /* Remove margin when collapsed */
 }
 
 .categories li {
