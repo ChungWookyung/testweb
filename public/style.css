@@ -331,47 +331,83 @@ body {
     color: var(--text-muted);
 }
 
-/* News Grid */
+/* News List (Formerly Grid) */
 .content-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 2rem;
+    display: flex;
+    /* Changed from grid to flex column */
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
 /* News Card */
 .card {
     background: #fff;
     border: none;
-    border-top: 3px solid var(--border-color);
-    padding: 1rem 0;
-    transition: border-color 0.2s;
+    border-top: 1px solid var(--border-color);
+    /* Thinner border */
+    padding: 1.5rem 0;
     display: flex;
-    flex-direction: column;
-    height: auto;
+    /* Flex row for side-by-side */
+    flex-direction: row;
+    /* Horizontal layout */
+    gap: 2rem;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
 
 .card:hover {
-    border-top-color: var(--primary-color);
+    background: #fdfdfd;
+    /* Subtle hover bg */
 }
 
-.card:active {
-    opacity: 0.7;
+/* Left side: Main Info */
+.card-main {
+    flex: 3;
+    /* 60% approx */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
 }
 
+/* Right side: Summary */
+.card-summary {
+    flex: 2;
+    /* 40% approx */
+    background: #fcfcfc;
+    padding: 1rem;
+    border-radius: 4px;
+    border: 1px solid #f0f0f0;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: #444;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-summary h4 {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05rem;
+}
+
+/* Adjust text styles for new layout */
 .card-date {
     font-size: 0.75rem;
     color: var(--text-muted);
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.5rem;
 }
 
 .card h3 {
     font-family: 'Noto Serif JP', serif;
-    font-size: 1.3rem;
-    margin-bottom: 0.8rem;
+    font-size: 1.4rem;
     line-height: 1.4;
     color: var(--text-color);
     font-weight: 700;
+    margin-bottom: 1rem;
 }
 
 .card p {
@@ -390,11 +426,27 @@ body {
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--primary-color);
-    margin-top: auto;
     display: inline-block;
-    background: #f0f4f8;
-    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border-color);
+    padding: 0.2rem 0.6rem;
     border-radius: 2px;
+    background: white;
+    width: fit-content;
+    margin-top: auto;
+    /* Push to bottom of main column */
+}
+
+@media (max-width: 768px) {
+    .card {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .card-summary {
+        background: none;
+        border: none;
+        padding: 0;
+    }
 }
 
 /* Loading */

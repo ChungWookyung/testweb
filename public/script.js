@@ -130,12 +130,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                 });
 
+                // Check for image enclosure (optional enhancement, but keeping simple for now)
+                // New Split Layout
                 card.innerHTML = `
-                    <div class="card-content">
+                    <div class="card-main">
                         <div class="card-date">${dateStr}</div>
                         <h3>${title}</h3>
-                        <p>${description}</p>
                         <div class="card-source">${source}</div>
+                    </div>
+                    <div class="card-summary">
+                        <h4>記事の要約</h4>
+                        <p>${description}</p>
                     </div>
                 `;
 
