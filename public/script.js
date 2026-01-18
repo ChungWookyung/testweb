@@ -378,49 +378,61 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    // New Function: Check for Updates in Background
+    // New Function: Check for Updates in Background with Batching
     async function checkTopicUpdates() {
-        const categories = document.querySelectorAll('.categories li');
+        const categories = Array.from(document.querySelectorAll('.categories li'));
         const now = new Date();
         const oneDayMs = 24 * 60 * 60 * 1000;
 
-        for (const item of categories) {
-            const query = item.getAttribute('data-query');
-            const region = item.getAttribute('data-region') || 'jp';
-            const type = item.getAttribute('data-type');
-            const customUrl = item.getAttribute('data-url');
-            const noFilter = item.getAttribute('data-no-filter') === 'true';
+        // Processing in batches of 5 to balance speed and browser resource usage
+        const BATCH_SIZE = 5;
 
-            // Skip current active topic to avoid double fetch if just loaded? 
-            // Better to show the count anyway for consistency.
+        for (let i = 0; i < categories.length; i += BATCH_SIZE) {
+            const batch = categories.slice(i, i + BATCH_SIZE);
 
-            try {
-                // Gentle delay between requests to avoid 429
-                await new Promise(resolve => setTimeout(resolve, 800));
+            // Process batch in parallel
+            await Promise.all(batch.map(async (item) => {
+                const query = item.getAttribute('data-query');
+                const region = item.getAttribute('data-region') || 'jp';
+                const type = item.getAttribute('data-type');
+                const customUrl = item.getAttribute('data-url');
+                const noFilter = item.getAttribute('data-no-filter') === 'true';
 
-                const items = await fetchRSSItems(query, region, type, customUrl, noFilter);
+                try {
+                    // Minimal random delay to prevent exact simultaneous storage hits if any
+                    // and allow UI thread to breathe
+                    await new Promise(r => setTimeout(r, Math.random() * 200));
 
-                let newCount = 0;
-                items.forEach(article => {
-                    const pubDateNode = article.querySelector('pubDate');
-                    if (pubDateNode) {
-                        const date = new Date(pubDateNode.textContent);
-                        if (!isNaN(date) && (now - date) < oneDayMs) {
-                            newCount++;
+                    const items = await fetchRSSItems(query, region, type, customUrl, noFilter);
+
+                    let newCount = 0;
+                    items.forEach(article => {
+                        const pubDateNode = article.querySelector('pubDate');
+                        if (pubDateNode) {
+                            const date = new Date(pubDateNode.textContent);
+                            if (!isNaN(date) && (now - date) < oneDayMs) {
+                                newCount++;
+                            }
                         }
+                    });
+
+                    if (newCount > 0) {
+                        const badge = document.createElement('span');
+                        badge.className = 'update-count';
+                        badge.innerHTML = ` +${newCount}`;
+                        // Ensure no duplicate badge
+                        const existingBadge = item.querySelector('.update-count');
+                        if (existingBadge) existingBadge.remove();
+                        item.appendChild(badge);
                     }
-                });
 
-                if (newCount > 0) {
-                    const badge = document.createElement('span');
-                    badge.className = 'update-count';
-                    badge.innerHTML = ` +${newCount}`;
-                    item.appendChild(badge);
+                } catch (err) {
+                    console.warn(`Update check failed for ${query}`, err);
                 }
+            }));
 
-            } catch (err) {
-                console.warn(`Update check failed for ${query}`, err);
-            }
+            // Small breathing room between batches
+            await new Promise(r => setTimeout(r, 100));
         }
     }
 
