@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AIニュースダッシュボード">
+    <title>AIニュースダッシュボード</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts for premium typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+</head>
+
+<body>
+    <div class="background-globes">
+        <div class="globe globe-1"></div>
+        <div class="globe globe-2"></div>
+        <div class="globe globe-3"></div>
+    </div>
+
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="material-icons-round">smart_toy</span>
+                <h2>AIニュース</h2>
+            </div>
+
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="トピックを検索...">
+                <button id="search-btn">
+                    <span class="material-icons-round">search</span>
+                </button>
+            </div>
+
+            <nav class="categories">
+                <h3>トレンド</h3>
+                <ul>
+                    <li data-query="人工知能" class="active">人工知能</li>
+                    <li data-query="機械学習">機械学習</li>
+                    <li data-query="大規模言語モデル">LLM / 大規模言語モデル</li>
+                    <li data-query="生成AI">生成AI</li>
+                    <li data-query="ロボティクス">ロボティクス</li>
+                    <li data-query="OpenAI">OpenAI</li>
+                    <li data-query="Google Gemini">Gemini</li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <h1 id="current-topic">人工知能</h1>
+                <div class="status-indicator" id="status-indicator">
+                    <span class="dot"></span> ライブ配信中
+                </div>
+            </header>
+
+            <div class="content-grid" id="news-grid">
+                <!-- News cards will be injected here -->
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>最新ニュースを取得中...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
