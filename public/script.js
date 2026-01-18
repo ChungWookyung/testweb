@@ -286,7 +286,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const months = Math.floor(days / 30);
         const years = Math.floor(days / 365);
 
-        if (hours < 24) {
+        if (minutes < 60) {
+            return `${minutes}分前`;
+        } else if (hours < 24) {
             return `${hours}時間前`;
         } else if (days < 7) {
             return `${days}日前`;

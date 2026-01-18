@@ -140,10 +140,24 @@ body {
 /* Collapsible state */
 .categories {
     transition: max-height 0.3s ease, opacity 0.3s ease;
-    max-height: 500px;
-    /* Arbitrary large height */
+    max-height: 1000px;
+    /* Increased for larger content */
     opacity: 1;
     overflow: hidden;
+}
+
+.mid-category {
+    margin-top: 10px;
+}
+
+.mid-cat-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #666;
+    padding: 5px 10px;
+    background-color: #f0f0f0;
+    margin-bottom: 5px;
+    border-radius: 4px;
 }
 
 .categories.collapsed {

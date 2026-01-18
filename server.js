@@ -169,14 +169,18 @@ app.post('/api/summarize', express.json(), async (req, res) => {
         const model = getGeminiModel();
         const prompt = `以下のニュースタイトルの内容を推測し、**50文字以上100文字未満の日本語**で簡潔に解説してください。\n\nニュースタイトル: ${title}\n補足情報: ${description}\n\n出力例: AI技術は新薬開発のスピードを劇的に向上させ、開発コストの大幅な削減に寄与しています。これにより、これまで治療法がなかった疾患への画期的なアプローチが期待されています。`;
 
+        // Generate content
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
 
         res.json({ summary: text });
     } catch (e) {
-        console.error("Summary failed:", e);
-        res.status(500).json({ error: "Server error", details: e.message });
+        console.error("Summary failed DETAILS:", JSON.stringify(e, null, 2)); // Log full object
+        console.error("Summary failed MSG:", e.message);
+
+        // Return detailed error to client for debugging (remove in prod)
+        res.status(500).json({ error: "Summary generation failed", details: e.message });
     }
 });
 
