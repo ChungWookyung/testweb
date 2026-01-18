@@ -63,12 +63,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // State for pagination
+    let allCurrentItems = [];
+    let displayedCount = 0;
+    const ITEMS_PER_PAGE = 20;
+
     async function fetchNews(query, region = 'jp') {
         showLoading();
 
         try {
             const response = await fetch(`/api/news?q=${encodeURIComponent(query)}&region=${region}`);
-            // ... (rest same) ...
             if (!response.ok) throw new Error('Network response was not ok');
 
             const xmlText = await response.text();
@@ -77,10 +81,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const items = Array.from(xmlDoc.querySelectorAll('item'));
 
+            // 1. Sort by Date Descending (Newest first)
+            items.sort((a, b) => {
+                const dateA = new Date(a.querySelector('pubDate').textContent);
+                const dateB = new Date(b.querySelector('pubDate').textContent);
+                return dateB - dateA;
+            });
+
             // Store for ranking usage
             allNewsItems = items;
 
-            renderNews(items);
+            // Store for pagination
+            allCurrentItems = items;
+            displayedCount = 0;
+
+            // Initial Render
+            newsGrid.innerHTML = ''; // Clear existing
+            renderNextBatch();
 
             // Render default ranking (Today)
             const activeTab = document.querySelector('.tab-btn.active');
@@ -98,14 +115,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderNews(items) {
-        newsGrid.innerHTML = '';
+    function renderNextBatch() {
+        const nextItems = allCurrentItems.slice(displayedCount, displayedCount + ITEMS_PER_PAGE);
 
-        if (items.length === 0) {
+        if (nextItems.length === 0 && displayedCount === 0) {
             newsGrid.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">ニュースが見つかりませんでした。</p>';
             return;
         }
 
+        renderNewsBatch(nextItems);
+        displayedCount += nextItems.length;
+
+        // Manage Load More Button
+        manageLoadMoreButton();
+    }
+
+    function manageLoadMoreButton() {
+        // Remove existing button if any
+        const existingBtn = document.getElementById('load-more-btn');
+        if (existingBtn) existingBtn.remove(); // We will re-append it at the bottom
+
+        // Check if we have more items to show
+        if (displayedCount < allCurrentItems.length) {
+            const btnContainer = document.createElement('div');
+            btnContainer.id = 'load-more-btn';
+            btnContainer.className = 'load-more-container'; // For styling
+            btnContainer.style.gridColumn = "1 / -1";
+            btnContainer.style.textAlign = "center";
+            btnContainer.style.marginTop = "20px";
+
+            btnContainer.innerHTML = `
+                <button class="load-more-btn">
+                    More <span class="material-icons-round" style="font-size: 1.2em; vertical-align: bottom;">expand_more</span>
+                </button>
+            `;
+
+            btnContainer.querySelector('button').onclick = () => {
+                // Remove button logic is handled inside manageLoadMoreButton call at end of renderNextBatch
+                renderNextBatch();
+            };
+
+            newsGrid.appendChild(btnContainer);
+        }
+    }
+
+    function renderNewsBatch(items) {
         items.forEach(item => {
             try {
                 const title = item.querySelector('title').textContent;
@@ -121,15 +175,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Clean description
-                // Clean description (Fix: Do not remove anchor nodes, just get text)
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = descriptionRaw;
-                // Just get text content, which strips tags but keeps text
                 let description = tempDiv.textContent || tempDiv.innerText || '';
-                // Clean up whitespace
                 description = description.replace(/\s+/g, ' ').trim();
 
-                // Clean title (remove source suffix if present for better AI context)
+                // Clean title
                 let cleanTitle = title;
                 const hyphenIndex = title.lastIndexOf(' - ');
                 if (hyphenIndex > 0) cleanTitle = title.substring(0, hyphenIndex);
@@ -139,15 +190,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.onclick = () => window.open(link, '_blank');
 
                 const dateObj = new Date(pubDate);
+                // 2. Relative Time Display
+                const relativeTime = getRelativeTime(dateObj);
                 const dateStr = dateObj.toLocaleDateString('ja-JP', {
                     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                 });
 
-                // Check for image enclosure (optional enhancement, but keeping simple for now)
-                // New Split Layout
-                const index = items.indexOf(item);
-                const summaryId = `summary-${index}`;
-                const isAutoSummary = index < 5;
+                // Check used ID for summary to be unique based on global link or title hash ideally, 
+                // but simple index in batch + offset is okay? No, index in allCurrentItems is better.
+                const totalIndex = allCurrentItems.indexOf(item);
+                const summaryId = `summary-${totalIndex}`;
+                // Auto summary only for the very first 5 items globally
+                const isAutoSummary = totalIndex < 5;
 
                 let summaryHtml = '';
                 if (isAutoSummary) {
@@ -166,8 +220,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 card.innerHTML = `
                     <div class="card-main">
-                        <div class="card-date">${dateStr}</div>
-                        <h3>${title}</h3> <!-- Display full title in UI -->
+                        <div class="card-meta">
+                           <span class="card-date">${dateStr}</span>
+                           <span class="card-relative-time">${relativeTime}</span>
+                        </div>
+                        <h3>${title}</h3>
                         <div class="card-source">${source}</div>
                     </div>
                     <div class="card-summary" id="${summaryId}">
@@ -177,7 +234,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 newsGrid.appendChild(card);
 
-                // Trigger Async Summary ONLY for first 5
                 if (isAutoSummary) {
                     fetchSummary(link, cleanTitle, description, summaryId);
                 }
@@ -186,6 +242,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn('Error parsing item', e);
             }
         });
+    }
+
+    function getRelativeTime(date) {
+        const now = new Date();
+        const diff = now - date; // milliseconds
+        const seconds = Math.floor(diff / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+        const weeks = Math.floor(days / 7);
+        const months = Math.floor(days / 30);
+        const years = Math.floor(days / 365);
+
+        if (hours < 24) {
+            return `${hours}時間前`;
+        } else if (days < 7) {
+            return `${days}日前`;
+        } else if (days < 30) {
+            return `${weeks}週間前`;
+        } else if (days < 365) {
+            return `${months}か月前`;
+        } else {
+            return `${years}年前`;
+        }
     }
 
     async function fetchSummary(url, title, description, elementId) {

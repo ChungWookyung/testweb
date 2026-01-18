@@ -136,30 +136,51 @@ app.post('/api/summarize', express.json(), async (req, res) => {
 
     console.log(`[Gemini] Requesting summary for: ${title}`);
 
-    try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
-        // Changed prompt to request 50-100 characters
-        const prompt = `以下のニュースタイトルの内容を推測し、**50文字以上100文字未満の日本語**で簡潔に解説してください。\n\nニュースタイトル: ${title}\n補足情報: ${description}\n\n出力例: AI技術は新薬開発のスピードを劇的に向上させ、開発コストの大幅な削減に寄与しています。これにより、これまで治療法がなかった疾患への画期的なアプローチが期待されています。`;
-        const payload = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
+    // Helper function to call Gemini API
+    const callGeminiSummary = (model) => {
+        return new Promise((resolve, reject) => {
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+            const prompt = `以下のニュースタイトルの内容を推測し、**50文字以上100文字未満の日本語**で簡潔に解説してください。\n\nニュースタイトル: ${title}\n補足情報: ${description}\n\n出力例: AI技術は新薬開発のスピードを劇的に向上させ、開発コストの大幅な削減に寄与しています。これにより、これまで治療法がなかった疾患への画期的なアプローチが期待されています。`;
+            const payload = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
 
-        const geminiReq = https.request(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (geminiRes) => {
-            let data = '';
-            geminiRes.on('data', c => data += c);
-            geminiRes.on('end', () => {
-                try {
-                    const json = JSON.parse(data);
-                    if (json.candidates?.[0]?.content?.parts?.[0]?.text) {
-                        res.json({ summary: json.candidates[0].content.parts[0].text });
+            const req = https.request(geminiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            }, (res) => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                    if (res.statusCode !== 200) {
+                        reject(new Error(`API Error: ${res.statusCode} ${data}`));
                     } else {
-                        res.status(500).json({ error: "No summary", details: json });
+                        resolve(data);
                     }
-                } catch (e) { res.status(500).json({ error: "Parse error" }); }
+                });
             });
+
+            req.on('error', (e) => reject(e));
+            req.write(payload);
+            req.end();
         });
-        geminiReq.on('error', e => res.status(500).json({ error: "Network error" }));
-        geminiReq.write(payload);
-        geminiReq.end();
-    } catch (e) { res.status(500).json({ error: "Server error" }); }
+    };
+
+    try {
+        // Try requested "gemini-2.5-flash-lite" first
+        let data = await callGeminiSummary('gemini-2.5-flash-lite').catch(async (e) => {
+            console.warn(`gemini-2.5-flash-lite summary failed (${e.message}). Falling back to gemini-1.5-flash.`);
+            return await callGeminiSummary('gemini-1.5-flash');
+        });
+
+        const json = JSON.parse(data);
+        if (json.candidates?.[0]?.content?.parts?.[0]?.text) {
+            res.json({ summary: json.candidates[0].content.parts[0].text });
+        } else {
+            res.status(500).json({ error: "No summary", details: json });
+        }
+    } catch (e) {
+        console.error("Summary failed:", e);
+        res.status(500).json({ error: "Server error" });
+    }
 });
 
 // Ranking Endpoint
