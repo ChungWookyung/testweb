@@ -27,55 +27,78 @@ app.get('/api/news', (req, res) => {
     });
 });
 
-// Helper to fetch text from URL (Improved implementation)
+// Helper to fetch text from URL (Improved implementation with logging)
 const fetchUrlText = (url) => {
     return new Promise((resolve, reject) => {
-        const protocol = url.startsWith('https') ? https : require('http');
-        const options = {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3'
-            }
-        };
+        console.log(`[Scraper] Fetching: ${url}`);
 
-        const req = protocol.get(url, options, (res) => {
-            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                // Follow redirect
-                fetchUrlText(res.headers.location).then(resolve).catch(reject);
+        const tryFetch = (currentUrl, redirectCount = 0) => {
+            if (redirectCount > 5) {
+                console.log(`[Scraper] Too many redirects for ${url}`);
+                resolve("");
                 return;
             }
 
-            let data = '';
-            res.on('data', (chunk) => { data += chunk; });
-            res.on('end', () => {
-                // Identify paragraphs
-                const pTags = data.match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
+            const protocol = currentUrl.startsWith('https') ? https : require('http');
+            const options = {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            };
 
-                let text = "";
-                if (pTags && pTags.length > 0) {
-                    // Extract text from P tags
-                    text = pTags.map(p => {
-                        return p.replace(/<[^>]+>/g, "").trim(); // Remove tags inside p
-                    }).join("\n");
-                } else {
-                    // Fallback to naive stripping if no p tags found (rare but possible)
-                    text = data.replace(/<script[^>]*>([\s\S]*?)<\/script>/gmi, "")
-                        .replace(/<style[^>]*>([\s\S]*?)<\/style>/gmi, "")
-                        .replace(/<[^>]+>/g, " ")
-                        .trim();
+            const req = protocol.get(currentUrl, options, (res) => {
+                // Handle Redirects
+                if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                    const nextUrl = new URL(res.headers.location, currentUrl).toString();
+                    console.log(`[Scraper] Redirect (${res.statusCode}) to: ${nextUrl}`);
+                    tryFetch(nextUrl, redirectCount + 1);
+                    return;
                 }
 
-                // Clean up whitespace
-                text = text.replace(/\s+/g, " ").trim();
-                resolve(text);
+                let data = '';
+                res.on('data', (chunk) => { data += chunk; });
+                res.on('end', () => {
+                    console.log(`[Scraper] Fetched ${currentUrl} - Status: ${res.statusCode}, Size: ${data.length}`);
+
+                    // Identify paragraphs
+                    const pTags = data.match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
+
+                    let text = "";
+                    if (pTags && pTags.length > 0) {
+                        text = pTags.map(p => {
+                            return p.replace(/<[^>]+>/g, "").trim();
+                        }).join("\n");
+                    } else {
+                        // Fallback
+                        text = data.replace(/<script[^>]*>([\s\S]*?)<\/script>/gmi, "")
+                            .replace(/<style[^>]*>([\s\S]*?)<\/style>/gmi, "")
+                            .replace(/<[^>]+>/g, " ")
+                            .trim();
+                    }
+
+                    text = text.replace(/\s+/g, " ").trim();
+                    console.log(`[Scraper] Extracted text length: ${text.length}`);
+                    resolve(text);
+                });
             });
-        });
-        req.on('error', (e) => resolve("")); // Resolve empty on error to fallback
-        req.setTimeout(8000, () => {
-            req.abort();
-            resolve("");
-        });
+
+            req.on('error', (e) => {
+                console.error(`[Scraper] Error: ${e.message}`);
+                resolve("");
+            });
+
+            req.setTimeout(8000, () => {
+                req.abort();
+                console.log(`[Scraper] Timeout`);
+                resolve("");
+            });
+        };
+
+        tryFetch(url);
     });
 };
 
