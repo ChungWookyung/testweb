@@ -1,9 +1,24 @@
 const express = require('express');
 const path = require('path');
 const https = require('https');
+const fs = require('fs');
 
 const app = express();
 const PORT = 3000;
+
+// Read API Key from api.txt (prevents hardcoding)
+let GEMINI_API_KEY = "";
+try {
+    const apiPth = path.join(__dirname, 'api.txt');
+    if (fs.existsSync(apiPth)) {
+        GEMINI_API_KEY = fs.readFileSync(apiPth, 'utf-8').trim();
+        console.log("API Key loaded successfully.");
+    } else {
+        console.warn("Warning: api.txt not found. Gemini features will not work.");
+    }
+} catch (error) {
+    console.error("Failed to read api.txt:", error);
+}
 
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
@@ -105,7 +120,11 @@ const fetchUrlText = (url) => {
 // Summarize Endpoint using Gemini API (Inference Mode)
 app.post('/api/summarize', express.json(), async (req, res) => {
     const { url, title, description } = req.body;
-    const GEMINI_API_KEY = "AIzaSyA2H6e4JwBbLzTmqg-Gev0QuSTpMl3WHMY";
+
+    if (!GEMINI_API_KEY) {
+        return res.status(500).json({ error: "Server Configuration Error: API Key missing" });
+    }
+
     console.log(`[Gemini] Requesting summary for: ${title}`);
 
     try {
@@ -136,7 +155,10 @@ app.post('/api/summarize', express.json(), async (req, res) => {
 // Ranking Endpoint
 app.post('/api/rank', express.json(), async (req, res) => {
     const { items } = req.body; // Expecting array of {id, title, description}
-    const GEMINI_API_KEY = "AIzaSyA2H6e4JwBbLzTmqg-Gev0QuSTpMl3WHMY";
+
+    if (!GEMINI_API_KEY) {
+        return res.status(500).json({ error: "Server Configuration Error: API Key missing" });
+    }
 
     console.log(`[Gemini] Ranking ${items.length} items...`);
 
