@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const region = item.getAttribute('data-region') || 'jp';
             const type = item.getAttribute('data-type');
             const customUrl = item.getAttribute('data-url');
+            const noFilter = item.getAttribute('data-no-filter') === 'true';
 
             currentTopic = topic;
             currentRegion = region;
@@ -54,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Clear search (visual)
             searchInput.value = '';
 
-            fetchNews(topic, region, type, customUrl);
+            fetchNews(topic, region, type, customUrl, noFilter);
         });
     });
 
@@ -75,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let displayedCount = 0;
     const ITEMS_PER_PAGE = 10;
 
-    async function fetchNews(query, region = 'jp', type = 'normal', customUrl = null) {
+    async function fetchNews(query, region = 'jp', type = 'normal', customUrl = null, noFilter = false) {
         showLoading();
 
         try {
@@ -94,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let items = Array.from(xmlDoc.querySelectorAll('item'));
 
             // Custom Source Filtering (Client-side AI Filter for CEPR etc)
-            if (type === 'custom') {
+            if (type === 'custom' && !noFilter) {
                 const aiKeywords = /AI|Artificial Intelligence|Machine Learning|Deep Learning|Neural|LLM|GPT|Gemini|Claude|Intelligence|Robotics|Data Science|Algorithm|Economist|Technology|Innovation|Digital/i;
                 // Expanded keywords slightly for "CEPR" context which is economic, so "Technology/Innovation" might be relevant overlap.
                 // User said "AI related", sticking mainly to AI but being slightly permissive.
