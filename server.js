@@ -5,6 +5,14 @@ const fs = require('fs');
 
 const app = express();
 const PORT = 3000;
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// Helper to initialize Gemini SDK
+const getGeminiModel = () => {
+    if (!GEMINI_API_KEY) throw new Error("API Key missing");
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    return genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+};
 
 // Read API Key from api.txt (prevents hardcoding)
 let GEMINI_API_KEY = "";
@@ -24,13 +32,17 @@ try {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Proxy endpoint to fetch Google News RSS
+// Proxy endpoint to fetch Google News RSS or Custom RSS
 app.get('/api/news', (req, res) => {
     const query = req.query.q || 'Artificial Intelligence';
     const region = req.query.region || 'jp';
+    const customUrl = req.query.url; // Support custom URL
 
     let url = '';
 
-    if (region === 'us') {
+    if (customUrl) {
+        url = customUrl;
+    } else if (region === 'us') {
         // English (US)
         url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
     } else {
@@ -38,13 +50,70 @@ app.get('/api/news', (req, res) => {
         url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ja&gl=JP&ceid=JP:ja`;
     }
 
-    https.get(url, (response) => {
+    const { URL } = require('url'); // Ensure URL module is available
+
+    // Helper to request with potential redirect handling (simple version)
+    // Detailed scraper fetchUrlText is overkill for RSS which usually is simpler, but let's use https.get directly first.
+    // However, CEPR might need headers or handle redirects.
+
+    // Using a simple fetch implementation for RSS
+    const protocol = url.startsWith('https') ? https : require('http');
+
+    protocol.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; AI-News-Bot/1.0)' // Identification
+        }
+    }, (response) => {
         let data = '';
         response.on('data', (chunk) => { data += chunk; });
         response.on('end', () => {
-            res.set('Content-Type', 'application/xml');
-            res.send(data);
-        });
+            // If Custom URL, we might need to filter for AI keywords manually if requested
+            if (customUrl) {
+                // Determine if we should filter (implied "AI info extraction" from user request)
+                // We will do simplistic text filtering on the XML string since we don't have an XML parser on server easily reachable without adding deps (cheerio/xml2js).
+                // But replacing data effectively without parsing is hard.
+                // Actually, the user wants "AI related info".
+                // Let's rely on Client Side filtering?
+                // No, user said "Extract and display".
+
+                // Let's do a simple regex filter on <item> blocks if it's XML.
+                // This is a bit "hacky" but works given we are sending XML to client.
+
+                // 1. Split by <item>
+                const parts = data.split('<item>');
+                if (parts.length > 1) {
+                    const header = parts[0];
+                    const items = parts.slice(1);
+
+                    const aiKeywords = /AI|Artificial Intelligence|Machine Learning|Deep Learning|Neural|LLM|GPT|Gemini|Claude|Intelligence|Robotics|Data Science|Algorithm/i;
+
+                    const filteredItems = items.filter(item => {
+                        // Check title and description
+                        return aiKeywords.test(item);
+                    });
+
+                    // Reassemble
+                    // Note: This relies on standard RSS structure. 
+                    // If filteredItems is empty, it might return empty RSS.
+
+                    // Clean up the last item closing tag if split casually?
+                    // split('<item>') keeps the content. The last part usually has </channel></rss> at the end.
+                    // Actually, <item> is the start.
+                    // simpler: just pass raw data and let client/script.js sort it?
+                    // Client-side filtering is easier to maintain and strictly strictly strictly strictly better here given no XML parser.
+                    // But user said "Extract" (抽出). 
+                    // I will pass ALL data to client, but add a filtered flag? 
+                    // OR, I'll allow client to receive all and script.js acts as the intelligence layer.
+                    // Wait, if the RSS is huge and non-AI is 99%, it's wasteful.
+                    // But CEPR RSS shouldn't be massive.
+
+                    // Let's pass raw data (proxy) and handle logic in script.js which has DOMParser.
+                    // It is safer.
+                }
+
+                res.set('Content-Type', 'application/xml');
+                res.send(data);
+            });
     }).on("error", (err) => {
         console.log("Error: " + err.message);
         res.status(500).send("Error fetching news");
