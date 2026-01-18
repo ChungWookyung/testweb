@@ -137,7 +137,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Check for image enclosure (optional enhancement, but keeping simple for now)
                 // New Split Layout
-                const summaryId = `summary-${items.indexOf(item)}`;
+                const index = items.indexOf(item);
+                const summaryId = `summary-${index}`;
+                const isAutoSummary = index < 5;
+
+                let summaryHtml = '';
+                if (isAutoSummary) {
+                    summaryHtml = `
+                        <h4>AI要約 (生成中...)</h4>
+                        <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                    `;
+                } else {
+                    summaryHtml = `
+                        <button class="ai-summary-btn" onclick="requestSummary(event, '${link}', '${cleanTitle.replace(/'/g, "\\'")}', '${description.replace(/'/g, "\\'")}', '${summaryId}')">
+                            <span class="material-icons" style="font-size:16px; vertical-align:middle;">auto_awesome</span>
+                            AIで要約する
+                        </button>
+                    `;
+                }
 
                 card.innerHTML = `
                     <div class="card-main">
@@ -146,16 +163,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="card-source">${source}</div>
                     </div>
                     <div class="card-summary" id="${summaryId}">
-                        <h4>AI要約 (生成中...)</h4>
-                        <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                        ${summaryHtml}
                     </div>
                 `;
 
                 newsGrid.appendChild(card);
 
-                // Trigger Async Summary with CLEAN Title and FULL Description text
-                // Pass cleanTitle for better inference
-                fetchSummary(link, cleanTitle, description, summaryId);
+                // Trigger Async Summary ONLY for first 5
+                if (isAutoSummary) {
+                    fetchSummary(link, cleanTitle, description, summaryId);
+                }
 
             } catch (e) {
                 console.warn('Error parsing item', e);
@@ -254,4 +271,18 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
     }
+
+    // Expose requestSummary to window so onclick can see it
+    window.requestSummary = (event, link, title, desc, id) => {
+        event.stopPropagation(); // Prevent card click
+
+        const element = document.getElementById(id);
+        if (element) {
+            element.innerHTML = `
+                <h4>AI要約 (生成中...)</h4>
+                <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+            `;
+            fetchSummary(link, title, desc, id);
+        }
+    };
 });

@@ -442,6 +442,34 @@ body {
         gap: 1rem;
     }
 
+    /* AI Summary Button */
+    .ai-summary-btn {
+        background: linear-gradient(135deg, #005596 0%, #0077b6 100%);
+        color: white;
+        border: none;
+        padding: 0.6rem 1rem;
+        border-radius: 2rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin: auto 0;
+        /* Center vertically if needed */
+    }
+
+    .ai-summary-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .ai-summary-btn:active {
+        transform: translateY(0);
+    }
+
     .card-summary {
         background: none;
         border: none;
