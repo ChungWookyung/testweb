@@ -107,6 +107,8 @@ app.post('/api/summarize', express.json(), async (req, res) => {
     const { url, title, description } = req.body;
     const GEMINI_API_KEY = "AIzaSyA2H6e4JwBbLzTmqg-Gev0QuSTpMl3WHMY"; // Hardcoded as requested
 
+    console.log(`[Gemini] Requesting summary for: ${title}`);
+
     try {
         // Skip scraping. Use Title and Description directly.
         // Prompt for inference summary (approx 30 chars)
@@ -136,23 +138,34 @@ app.post('/api/summarize', express.json(), async (req, res) => {
             let data = '';
             geminiRes.on('data', (chunk) => { data += chunk; });
             geminiRes.on('end', () => {
+                console.log(`[Gemini] Response Code: ${geminiRes.statusCode}`);
+
                 try {
                     const json = JSON.parse(data);
+
+                    if (geminiRes.statusCode !== 200) {
+                        console.error('[Gemini] API Error:', JSON.stringify(json, null, 2));
+                        res.status(geminiRes.statusCode).json({ error: "Gemini API Error", details: json });
+                        return;
+                    }
+
                     if (json.candidates && json.candidates[0] && json.candidates[0].content) {
                         const summary = json.candidates[0].content.parts[0].text;
+                        console.log(`[Gemini] Summary generated: ${summary}`);
                         res.json({ summary: summary });
                     } else {
-                        // If blocked or error
+                        console.error('[Gemini] Unexpected format:', JSON.stringify(json, null, 2));
                         res.status(500).json({ error: "No summary generated", details: json });
                     }
                 } catch (e) {
+                    console.error('[Gemini] Parse Error:', e, 'Raw Data:', data);
                     res.status(500).json({ error: "Failed to parse Gemini response" });
                 }
             });
         });
 
         geminiReq.on('error', (e) => {
-            console.error(e);
+            console.error('[Gemini] Network Error:', e);
             res.status(500).json({ error: "Gemini API request failed" });
         });
 
@@ -160,7 +173,7 @@ app.post('/api/summarize', express.json(), async (req, res) => {
         geminiReq.end();
 
     } catch (error) {
-        console.error(error);
+        console.error('[Gemini] Server Error:', error);
         res.status(500).json({ error: "Server error" });
     }
 });
