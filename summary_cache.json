@@ -1,0 +1,4 @@
+{
+  "http://example.com/article1": "This is a mocked summary for testing caching behavior. It mimics a successful API response.",
+  "Real API Test Article": "このニュース記事は、API（アプリケーション・プログラミング・インターフェース）の実際の動作とキャッシュ機能を検証するためのテスト記事です。APIとのデータのやり取りが正常に行われるか、データが適切に保存・再利用されるかなどを確認していると推測されます。\n"
+}

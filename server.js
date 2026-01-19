@@ -4,7 +4,7 @@ const https = require('https');
 const fs = require('fs');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Helper to initialize Gemini SDK
@@ -342,8 +342,8 @@ const saveSummaryCache = () => {
 app.post('/api/summarize', express.json(), async (req, res) => {
     const { url, title, description } = req.body;
 
-    // Check Cache first (Use URL as key, fallback to title if needed)
-    const cacheKey = url || title;
+    // Check Cache first (Use Title as primary key for stability, fallback to URL)
+    const cacheKey = title || url;
     if (summaryCache[cacheKey]) {
         console.log(`[Summary Cache] Hit for: ${title}`);
         return res.json({ summary: summaryCache[cacheKey] });
